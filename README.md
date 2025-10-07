@@ -37,6 +37,38 @@ source setup_uboone_products.sh
 make dk2nu   # or make all
 ```
 
+On AlmaLinux 9 MicroBooNE nodes the helper defaults to the following UPS
+releases, which match the currently published e20/e15 stacks:
+
+| Product | Version | Qualifiers |
+| --- | --- | --- |
+| `root` | `v6_28_12` | `e20:p3915:prof` |
+| `cmake` | `v3_20_0` | `Linux64bit+3.10-2.17` |
+| `nlohmann_json` | `v3_11_2` | `e20` |
+| `tbb` | `v2021_9_0` | `e20` |
+| `libtorch` | `v1_13_1b` | `e20:prof` |
+| `eigen` | `v3_4_0` | `e20` |
+| `boost` | `v1_82_0` | `e20:prof` |
+| `ppfx` | `v02_17_07` | `e20:prof` |
+| `dk2nu` | `v01_05_01b` | `e15:prof` |
+| `jobsub_client` | `v1_3_1` | *(none)* |
+
+If a particular UPS product is missing on your host, list the versions that
+are available with:
+
+```
+ups list -aK+ <product>
+```
+
+Replace `<product>` with the failing dependency name (for example `root` or
+`ppfx`) and export matching `NUMIANA_<PRODUCT>_VERSION`/`QUALS` overrides before
+re-sourcing the helper.  The helper honours any variables you set, so you can
+pin a specific combination or supply your own fallback sequence.
+
+> **Note:** `dk2nu` has only been published with the older e15 qualifier so far.
+> The helper keeps that release by default; override `NUMIANA_DK2NU_VERSION` and
+> `_QUALS` if your site provides a newer toolchain.
+
 The script exposes environment variables such as `NUMIANA_PPFX_VERSION` and
 `NUMIANA_DK2NU_QUALS` so you can override the default product versions or
 qualifiers if your site needs different releases.
