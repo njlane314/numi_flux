@@ -3,7 +3,8 @@
 setup(){
 
     export MODE="NUMI"
-    export BOOSTROOT=${BOOST_DIR}/source/boost_1_66_0
+    export BOOSTROOT=${BOOST_INC}
+    #export BOOSTROOT=${BOOST_DIR}/source/boost_1_66_0
     #DK2NU:
     export DK2NU_INC=${DK2NU}/include/dk2nu/tree
     export DK2NU_LIB=${DK2NU}/lib
