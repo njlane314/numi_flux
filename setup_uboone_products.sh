@@ -40,11 +40,11 @@ setup ifdhc
 : "${NUMIANA_BOOST_QUALS:=e20:prof}"
 : "${NUMIANA_PPFX_VERSION:=v02_18_02}"
 : "${NUMIANA_PPFX_QUALS:=e20:prof}"
-# dk2nu has no e20 builds on this node; default to skipping it.
-# If needed, set NUMIANA_DK2NU_VERSION=v01_05_01b and NUMIANA_DK2NU_QUALS=e15:prof manually,
-# or build dk2nu for e20 and add its products area to $PRODUCTS.
-: "${NUMIANA_DK2NU_VERSION:=}"
-: "${NUMIANA_DK2NU_QUALS:=}"
+# dk2nu is required for the flux build.  Default to the known compatible
+# mcc9 release built against the e15 toolchain, but allow callers to override
+# it before sourcing this script.
+: "${NUMIANA_DK2NU_VERSION:=v01_05_01b}"
+: "${NUMIANA_DK2NU_QUALS:=e15:prof}"
 : "${NUMIANA_JOBSUB_VERSION:=v_lite}"
 : "${NUMIANA_JOBSUB_QUALS:=}"
 
@@ -56,11 +56,11 @@ setup libtorch    "${NUMIANA_LIBTORCH_VERSION}"    -q "${NUMIANA_LIBTORCH_QUALS}
 setup eigen       "${NUMIANA_EIGEN_VERSION}"       -q "${NUMIANA_EIGEN_QUALS}"
 setup boost       "${NUMIANA_BOOST_VERSION}"       -q "${NUMIANA_BOOST_QUALS}"
 setup ppfx        "${NUMIANA_PPFX_VERSION}"        -q "${NUMIANA_PPFX_QUALS}"
-if [[ -n "${NUMIANA_DK2NU_VERSION}" ]]; then
-  setup dk2nu "${NUMIANA_DK2NU_VERSION}" -q "${NUMIANA_DK2NU_QUALS}"
-else
-  echo "[numi_flux] dk2nu not requested; skipping."
+if [[ -z "${NUMIANA_DK2NU_VERSION}" || -z "${NUMIANA_DK2NU_QUALS}" ]]; then
+  echo "[numi_flux] Error: NUMIANA_DK2NU_VERSION and NUMIANA_DK2NU_QUALS must be set." >&2
+  return 1 2>/dev/null || exit 1
 fi
+setup dk2nu "${NUMIANA_DK2NU_VERSION}" -q "${NUMIANA_DK2NU_QUALS}"
 
 if [[ -n "${NUMIANA_JOBSUB_QUALS}" ]]; then
   setup jobsub_client "${NUMIANA_JOBSUB_VERSION}" -q "${NUMIANA_JOBSUB_QUALS}"
