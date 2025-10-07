@@ -26,6 +26,21 @@ make clean
 - `flugg` just needs `root` basically
 - `dk2nu` pulls in additionally `ppfx`, `boost`, `dk2nu`
 
+### Quick start on MicroBooNE gpvm/uboonepro machines
+
+The new `setup_uboone_products.sh` helper wraps the standard UPS products used
+by MicroBooNE and then sources `setup_numiana.sh` to export the repository
+paths.  Source it from the repository top level before building:
+
+```
+source setup_uboone_products.sh
+make dk2nu   # or make all
+```
+
+The script exposes environment variables such as `NUMIANA_PPFX_VERSION` and
+`NUMIANA_DK2NU_QUALS` so you can override the default product versions or
+qualifiers if your site needs different releases.
+
 ### File Locations
 - `flugg` : originally available on bluearc
     - FHC : `/nusoft/data/flux/blackbird-numix/flugg_mn000z200i_rp11_lowth_pnut_f11f093bbird_target/root`
