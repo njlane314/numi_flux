@@ -2,10 +2,29 @@ from __future__ import print_function
 
 import io
 import os
+from pathlib import Path
 
 import ROOT
 
-ROOT.gSystem.Load("../lib/Dk2NuFlux_cc.so")
+REPO_DIR = Path(__file__).resolve().parents[1]
+LIB_PATH = REPO_DIR / "lib" / "Dk2NuFlux_cc.so"
+
+if not LIB_PATH.exists():
+    raise RuntimeError(
+        "{} does not exist. Please build the project (e.g. `make dk2nu`) "
+        "after sourcing the appropriate setup script.".format(LIB_PATH)
+    )
+
+load_result = ROOT.gSystem.Load(str(LIB_PATH))
+if load_result != 0:
+    raise RuntimeError(
+        "Failed to load `{}` (gSystem.Load returned {}). Check that the ROOT "
+        "environment matches the build used to produce the library and that "
+        "all dependent libraries such as libEG are available on your LD_LIBRARY_PATH.".format(
+            LIB_PATH, load_result
+        )
+    )
+
 ROOT.gROOT.SetBatch(True)
 
 # Default globs for the Geant4 10.4 MicroBooNE dk2nu production.
