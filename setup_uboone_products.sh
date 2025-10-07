@@ -25,7 +25,7 @@ setup ifdhc
 
 # Allow users to override product versions/qualifiers.
 : "${NUMIANA_ROOT_VERSION:=v6_28_12}"
-: "${NUMIANA_ROOT_QUALS:=e20:p3920:prof}"
+: "${NUMIANA_ROOT_QUALS:=e20:p3915:prof}"
 : "${NUMIANA_CMAKE_VERSION:=v3_20_0}"
 : "${NUMIANA_CMAKE_QUALS:=Linux64bit+3.10-2.17}"
 : "${NUMIANA_NLOHMANN_JSON_VERSION:=v3_11_2}"
@@ -36,13 +36,16 @@ setup ifdhc
 : "${NUMIANA_LIBTORCH_QUALS:=e20:prof}"
 : "${NUMIANA_EIGEN_VERSION:=v3_4_0}"
 : "${NUMIANA_EIGEN_QUALS:=e20}"
-: "${NUMIANA_BOOST_VERSION:=v1_66_0}"
+: "${NUMIANA_BOOST_VERSION:=v1_73_0}"
 : "${NUMIANA_BOOST_QUALS:=e20:prof}"
-: "${NUMIANA_PPFX_VERSION:=v1_72}"
+: "${NUMIANA_PPFX_VERSION:=v02_18_02}"
 : "${NUMIANA_PPFX_QUALS:=e20:prof}"
-: "${NUMIANA_DK2NU_VERSION:=v01_05_05d}"
-: "${NUMIANA_DK2NU_QUALS:=e20}"
-: "${NUMIANA_JOBSUB_VERSION:=v1_4_2}"
+# dk2nu has no e20 builds on this node; default to skipping it.
+# If needed, set NUMIANA_DK2NU_VERSION=v01_05_01b and NUMIANA_DK2NU_QUALS=e15:prof manually,
+# or build dk2nu for e20 and add its products area to $PRODUCTS.
+: "${NUMIANA_DK2NU_VERSION:=}"
+: "${NUMIANA_DK2NU_QUALS:=}"
+: "${NUMIANA_JOBSUB_VERSION:=v_lite}"
 : "${NUMIANA_JOBSUB_QUALS:=}"
 
 setup root        "${NUMIANA_ROOT_VERSION}"        -q "${NUMIANA_ROOT_QUALS}"
@@ -53,7 +56,11 @@ setup libtorch    "${NUMIANA_LIBTORCH_VERSION}"    -q "${NUMIANA_LIBTORCH_QUALS}
 setup eigen       "${NUMIANA_EIGEN_VERSION}"       -q "${NUMIANA_EIGEN_QUALS}"
 setup boost       "${NUMIANA_BOOST_VERSION}"       -q "${NUMIANA_BOOST_QUALS}"
 setup ppfx        "${NUMIANA_PPFX_VERSION}"        -q "${NUMIANA_PPFX_QUALS}"
-setup dk2nu       "${NUMIANA_DK2NU_VERSION}"       -q "${NUMIANA_DK2NU_QUALS}"
+if [[ -n "${NUMIANA_DK2NU_VERSION}" ]]; then
+  setup dk2nu "${NUMIANA_DK2NU_VERSION}" -q "${NUMIANA_DK2NU_QUALS}"
+else
+  echo "[numi_flux] dk2nu not requested; skipping."
+fi
 
 if [[ -n "${NUMIANA_JOBSUB_QUALS}" ]]; then
   setup jobsub_client "${NUMIANA_JOBSUB_VERSION}" -q "${NUMIANA_JOBSUB_QUALS}"
@@ -72,7 +79,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/setup_numiana.sh"
 
 # Sanity checks so users notice missing dependencies immediately.
 missing_vars=()
-for v in NUMIANA_DIR NUMIANA_INC PPFX_DIR PPFX_LIB DK2NU BOOST_DIR; do
+for v in NUMIANA_DIR NUMIANA_INC PPFX_DIR PPFX_LIB BOOST_DIR; do
   if [[ -z "${!v:-}" ]]; then
     missing_vars+=("$v")
   fi
