@@ -24,9 +24,8 @@ setup sam_web_client
 setup ifdhc
 
 # Allow users to override product versions/qualifiers.
-# Defaults tuned to the AlmaLinux 9 MicroBooNE UPS snapshot.
 : "${NUMIANA_ROOT_VERSION:=v6_28_12}"
-: "${NUMIANA_ROOT_QUALS:=e20:p3915:prof}"
+: "${NUMIANA_ROOT_QUALS:=e20:p3920:prof}"
 : "${NUMIANA_CMAKE_VERSION:=v3_20_0}"
 : "${NUMIANA_CMAKE_QUALS:=Linux64bit+3.10-2.17}"
 : "${NUMIANA_NLOHMANN_JSON_VERSION:=v3_11_2}"
@@ -37,50 +36,29 @@ setup ifdhc
 : "${NUMIANA_LIBTORCH_QUALS:=e20:prof}"
 : "${NUMIANA_EIGEN_VERSION:=v3_4_0}"
 : "${NUMIANA_EIGEN_QUALS:=e20}"
-: "${NUMIANA_BOOST_VERSION:=v1_82_0}"
+: "${NUMIANA_BOOST_VERSION:=v1_66_0}"
 : "${NUMIANA_BOOST_QUALS:=e20:prof}"
-: "${NUMIANA_PPFX_VERSION:=v02_17_07}"
+: "${NUMIANA_PPFX_VERSION:=v1_72}"
 : "${NUMIANA_PPFX_QUALS:=e20:prof}"
-: "${NUMIANA_DK2NU_VERSION:=v01_05_01b}"
-# dk2nu has not yet been rebuilt for the e20 toolchain; use the e15 release
-# unless the user overrides it explicitly.
-: "${NUMIANA_DK2NU_QUALS:=e15:prof}"
-: "${NUMIANA_JOBSUB_VERSION:=v1_3_1}"
+: "${NUMIANA_DK2NU_VERSION:=v01_05_05d}"
+: "${NUMIANA_DK2NU_QUALS:=e20}"
+: "${NUMIANA_JOBSUB_VERSION:=v1_4_2}"
 : "${NUMIANA_JOBSUB_QUALS:=}"
 
-setup_errors=()
-
-setup_product() {
-  local product=$1
-  local version=$2
-  local quals=$3
-  local setup_args=("${product}" "${version}")
-
-  if [[ -n "${quals}" ]]; then
-    setup_args+=("-q" "${quals}")
-  fi
-
-  if ! setup "${setup_args[@]}"; then
-    setup_errors+=("${product}")
-    echo "[numi_flux] Failed to set up ${product} ${version} ${quals:+(quals: ${quals})}" >&2
-    echo "[numi_flux] To inspect available versions run: ups list -aK+ ${product}" >&2
-  fi
-}
-
-setup_product root        "${NUMIANA_ROOT_VERSION}"        "${NUMIANA_ROOT_QUALS}"
-setup_product cmake       "${NUMIANA_CMAKE_VERSION}"       "${NUMIANA_CMAKE_QUALS}"
-setup_product nlohmann_json "${NUMIANA_NLOHMANN_JSON_VERSION}" "${NUMIANA_NLOHMANN_JSON_QUALS}"
-setup_product tbb         "${NUMIANA_TBB_VERSION}"         "${NUMIANA_TBB_QUALS}"
-setup_product libtorch    "${NUMIANA_LIBTORCH_VERSION}"    "${NUMIANA_LIBTORCH_QUALS}"
-setup_product eigen       "${NUMIANA_EIGEN_VERSION}"       "${NUMIANA_EIGEN_QUALS}"
-setup_product boost       "${NUMIANA_BOOST_VERSION}"       "${NUMIANA_BOOST_QUALS}"
-setup_product ppfx        "${NUMIANA_PPFX_VERSION}"        "${NUMIANA_PPFX_QUALS}"
-setup_product dk2nu       "${NUMIANA_DK2NU_VERSION}"       "${NUMIANA_DK2NU_QUALS}"
+setup root        "${NUMIANA_ROOT_VERSION}"        -q "${NUMIANA_ROOT_QUALS}"
+setup cmake       "${NUMIANA_CMAKE_VERSION}"       -q "${NUMIANA_CMAKE_QUALS}"
+setup nlohmann_json "${NUMIANA_NLOHMANN_JSON_VERSION}" -q "${NUMIANA_NLOHMANN_JSON_QUALS}"
+setup tbb         "${NUMIANA_TBB_VERSION}"         -q "${NUMIANA_TBB_QUALS}"
+setup libtorch    "${NUMIANA_LIBTORCH_VERSION}"    -q "${NUMIANA_LIBTORCH_QUALS}"
+setup eigen       "${NUMIANA_EIGEN_VERSION}"       -q "${NUMIANA_EIGEN_QUALS}"
+setup boost       "${NUMIANA_BOOST_VERSION}"       -q "${NUMIANA_BOOST_QUALS}"
+setup ppfx        "${NUMIANA_PPFX_VERSION}"        -q "${NUMIANA_PPFX_QUALS}"
+setup dk2nu       "${NUMIANA_DK2NU_VERSION}"       -q "${NUMIANA_DK2NU_QUALS}"
 
 if [[ -n "${NUMIANA_JOBSUB_QUALS}" ]]; then
-  setup_product jobsub_client "${NUMIANA_JOBSUB_VERSION}" "${NUMIANA_JOBSUB_QUALS}"
+  setup jobsub_client "${NUMIANA_JOBSUB_VERSION}" -q "${NUMIANA_JOBSUB_QUALS}"
 else
-  setup_product jobsub_client "${NUMIANA_JOBSUB_VERSION}" ""
+  setup jobsub_client "${NUMIANA_JOBSUB_VERSION}"
 fi
 
 # The UPS boost product defines BOOST_INC but not BOOST_DIR.  Populate the
@@ -99,10 +77,6 @@ for v in NUMIANA_DIR NUMIANA_INC PPFX_DIR PPFX_LIB DK2NU BOOST_DIR; do
     missing_vars+=("$v")
   fi
 done
-
-if (( ${#setup_errors[@]} )); then
-  echo "[numi_flux] The UPS setup reported errors for: ${setup_errors[*]}" >&2
-fi
 
 if (( ${#missing_vars[@]} )); then
   echo "[numi_flux] Warning: the following variables are unset after setup:" >&2
