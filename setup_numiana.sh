@@ -1,27 +1,17 @@
 #!/bin/bash
-
-setup(){
-
-    export MODE="NUMI"
-    export BOOSTROOT=${BOOST_DIR}/source/boost_1_66_0
-    #DK2NU:
-    export DK2NU_INC=${DK2NU}/include/dk2nu/tree
-    export DK2NU_LIB=${DK2NU}/lib
-
-    # setup for jobsub client
-    # according to the prescription in Mike Kirby's talk
-    # minerva doc-10551, Dec 2014 (same doc can be found for other experiments)
-    export NUMIANA_DIR=${PWD}
-    export NUMIANA_INC=${NUMIANA_DIR}/include
-    export LD_LIBRARY_PATH=${NUMIANA_DIR}/lib:${NUMIANA_DIR}/dict:${PPFX_DIR}/lib:${PPFX_LIB}:$LD_LIBRARY_PATH
-    export LIBRARY_PATH=$LIBRARY_PATH:$LD_LIBRARY_PATH
-}
-HOST=$(hostname -f)
-echo $HOST
-if echo "$HOST" | grep 'uboone';then
-    echo "executing for the $HOST"
-    setup
-else
-    echo "This is not a uboone machine. Sorry!"
+set -e
+source /cvmfs/uboone.opensciencegrid.org/products/setup_uboone.sh
+QUALS="${QUALS:-e19:prof}"
+setup gcc "${GCC:-v8_2_0}"
+setup root "${ROOT:-v6_26_10}" -q "${QUALS}"
+if [[ "${1:-full}" == full ]]; then
+  setup boost "${BOOST:-v1_66_0}" -q "${QUALS}"
+  [[ -n "${DK2NU_VER:-}" ]] && setup dk2nu "${DK2NU_VER}" -q "${QUALS}"
+  [[ -n "${PPFX_VER:-}"  ]] && setup ppfx  "${PPFX_VER}"  -q "${QUALS}"
 fi
-
+export NUMIANA_DIR="${NUMIANA_DIR:-$PWD}"
+export NUMIANA_INC="$NUMIANA_DIR/include"
+[[ -n "${BOOST_INC:-}" ]] && export BOOSTROOT="${BOOST_INC}"
+[[ -n "${DK2NU:-}" ]] && export DK2NU_INC="${DK2NU}/include/dk2nu/tree" DK2NU_LIB="${DK2NU}/lib"
+export LD_LIBRARY_PATH="$NUMIANA_DIR/lib:$NUMIANA_DIR/dict${PPFX_DIR:+:$PPFX_DIR/lib}:$LD_LIBRARY_PATH"
+export LIBRARY_PATH="$LD_LIBRARY_PATH:$LIBRARY_PATH"
