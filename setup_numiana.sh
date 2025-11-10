@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+#set -e
 source /cvmfs/uboone.opensciencegrid.org/products/setup_uboone.sh
 QUALS="${QUALS:-e19:prof}"
 setup gcc "${GCC:-v8_2_0}"
