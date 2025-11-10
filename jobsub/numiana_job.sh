@@ -46,7 +46,7 @@ fi
 
 echo
 box "Setting up local numi_flux repo and building dictionaries"
-source setup_numiana_grid.sh
+source setup_grid.sh
 make all
 
 if [[ ! -f "${MACRO}" ]]; then
