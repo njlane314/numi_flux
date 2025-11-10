@@ -9,17 +9,12 @@ This was originally a fork of Marco's original NuMIFlux [repo](https://github.co
 
 After setting up `uboonecode` or optionally only the dependencies (see below)
 ```
-source setup_numiana.sh
-make all
-```
-If you just want to work with individual `<flux_type>`s where `<flux_type>` is either `dk2nu` or `flugg`, one can do
-```
-make base
-make <flux_type>
-```
-To start afresh, as usual one can do
-```
-make clean
+cd /path/to/numi_flux
+chmod +x build.sh
+source setup_numiana.sh            # or: source setup_numiana.sh base
+./build.sh                         # builds base, flugg, dk2nu if dk2nu/ppfx are set
+./build.sh clean                   # clean
+./build.sh base|flugg|dk2nu        # build a single target
 ```
 
 ### Dependencies
