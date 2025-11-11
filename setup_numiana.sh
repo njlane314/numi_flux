@@ -7,6 +7,9 @@ if [[ -f "$COMMON_SETUPS" ]]; then
 else
   printf 'setup_numiana.sh: warning: missing common UPS setups: %s\n' "$COMMON_SETUPS" >&2
 fi
+
+# Ensure a clean UPS state (avoid container’s preloaded site stack)
+type unsetup &>/dev/null && unsetup -a || true
 CFG="${NUMIANA_CONFIG:-$(dirname "${BASH_SOURCE[0]}")/config_numiana.sh}"
 [[ -f "$CFG" ]] && source "$CFG"
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
