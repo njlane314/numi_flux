@@ -1,10 +1,12 @@
-QUALS=e19:prof
-GCC=v8_2_0
-ROOT=v6_26_10
-BOOST=v1_66_0
-DK2NU_VER=
-PPFX_VER=
-FLUGG_FHC_DIR=
-FLUGG_RHC_DIR=
-DK2NU_FHC_DIR=
-DK2NU_RHC_DIR=
+export QUALS=e15:prof
+
+export GCC=v6_4_0
+export ROOT=v6_12_06a
+export BOOST=v1_66_0
+export DK2NU_VER=v01_05_01b
+export PPFX_VER=v02_03
+
+export FLUGG_FHC_DIR=
+export FLUGG_RHC_DIR=
+export DK2NU_FHC_DIR=
+export DK2NU_RHC_DIR=
