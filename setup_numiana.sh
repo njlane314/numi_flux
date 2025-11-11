@@ -8,8 +8,7 @@ else
   printf 'setup_numiana.sh: warning: missing common UPS setups: %s\n' "$COMMON_SETUPS" >&2
 fi
 
-# Ensure a clean UPS state (avoid container’s preloaded site stack)
-type unsetup_all &>/dev/null && unsetup_all || true
+# Avoid touching any preloaded UPS state; callers should start from a clean shell
 CFG="${NUMIANA_CONFIG:-$(dirname "${BASH_SOURCE[0]}")/config_numiana.sh}"
 [[ -f "$CFG" ]] && source "$CFG"
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
