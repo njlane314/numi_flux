@@ -9,7 +9,7 @@ else
 fi
 
 # Ensure a clean UPS state (avoid container’s preloaded site stack)
-type unsetup &>/dev/null && unsetup -a || true
+type unsetup_all &>/dev/null && unsetup_all || true
 CFG="${NUMIANA_CONFIG:-$(dirname "${BASH_SOURCE[0]}")/config_numiana.sh}"
 [[ -f "$CFG" ]] && source "$CFG"
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
