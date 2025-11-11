@@ -1,9 +1,11 @@
 #!/bin/bash
-UBOONE_SETUP=/cvmfs/uboone.opensciencegrid.org/products/setup_uboone.sh
-if [[ -f "$UBOONE_SETUP" ]]; then
-  source "$UBOONE_SETUP"
+# Minimal UPS bootstrap (no site auto-setup)
+COMMON_SETUPS=/cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups
+if [[ -f "$COMMON_SETUPS" ]]; then
+  source "$COMMON_SETUPS"
+  export PRODUCTS=/cvmfs/larsoft.opensciencegrid.org/products:/cvmfs/uboone.opensciencegrid.org/products:${PRODUCTS:-}
 else
-  printf 'setup_numiana.sh: warning: missing expected environment setup script: %s\n' "$UBOONE_SETUP" >&2
+  printf 'setup_numiana.sh: warning: missing common UPS setups: %s\n' "$COMMON_SETUPS" >&2
 fi
 CFG="${NUMIANA_CONFIG:-$(dirname "${BASH_SOURCE[0]}")/config_numiana.sh}"
 [[ -f "$CFG" ]] && source "$CFG"
