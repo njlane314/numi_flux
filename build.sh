@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 set -e
-cd "$(dirname "${BASH_SOURCE[0]}")"
-source ./setup_numiana.sh "${MODE:-full}"
-t="${1:-all}"
-if [[ "$t" == clean ]]; then make clean; exit 0; fi
-if [[ "$t" == all ]]; then
-  make base
-  make flugg
-  [[ -n "${DK2NU_LIB:-}" ]] && make dk2nu
-  exit 0
+cd "$(dirname "$0")"
+source ./setup_numiana.sh
+if ! command -v root-config >/dev/null 2>&1; then
+  echo "build.sh: error: root-config not found; ensure ROOT is set up." >&2
+  exit 1
 fi
-make "$t"
+make "${1:-all}"
