@@ -1,14 +1,8 @@
 #!/bin/bash
-# Minimal UPS bootstrap (no site auto-setup)
-COMMON_SETUPS=/cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups
-if [[ -f "$COMMON_SETUPS" ]]; then
-  source "$COMMON_SETUPS"
-  export PRODUCTS=/cvmfs/larsoft.opensciencegrid.org/products:/cvmfs/uboone.opensciencegrid.org/products:${PRODUCTS:-}
-else
-  printf 'setup_numiana.sh: warning: missing common UPS setups: %s\n' "$COMMON_SETUPS" >&2
-fi
+source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setup
+source /cvmfs/larsoft.opensciencegrid.org/products/setup
+source /cvmfs/uboone.opensciencegrid.org/products/setup
 
-# Avoid touching any preloaded UPS state; callers should start from a clean shell
 CFG="${NUMIANA_CONFIG:-$(dirname "${BASH_SOURCE[0]}")/config_numiana.sh}"
 [[ -f "$CFG" ]] && source "$CFG"
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
