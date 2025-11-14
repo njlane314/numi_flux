@@ -1,7 +1,7 @@
 #!/bin/bash
 source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setup
-source /cvmfs/larsoft.opensciencegrid.org/products/setup
-source /cvmfs/uboone.opensciencegrid.org/products/setup
+#source /cvmfs/larsoft.opensciencegrid.org/products/setup
+#source /cvmfs/uboone.opensciencegrid.org/products/setup
 
 CFG="${NUMIANA_CONFIG:-$(dirname "${BASH_SOURCE[0]}")/config_numiana.sh}"
 [[ -f "$CFG" ]] && source "$CFG"
