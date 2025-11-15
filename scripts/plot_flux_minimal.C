@@ -22,8 +22,8 @@ void plot_flux_minimal() {
 
   const double Emin = 0.0;
   const double Emax = 10.0;     // extend to 8 GeV if you like (bins stay 10 MeV)
-  const double ymin = 1e-3;     // y-axis clip
-  const double ymax = 1e6;
+  const double ymin = 1e-12;     // y-axis clip
+  const double ymax = 1e-3;
 
   const char* OUT_FHC = "uboone_flux_FHC.pdf";
   const char* OUT_RHC = "uboone_flux_RHC.pdf";
