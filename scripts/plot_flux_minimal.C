@@ -17,9 +17,9 @@ void plot_flux_minimal() {
   const char* FHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_fhc_ppfx_g4_10_4.root";
   const char* RHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_rhc_ppfx_g4_10_4.root";
   const double Emin = 0.0;
-  const double Emax = 8.0;          // extend to 8 GeV
-  const double ymin = 1e-15;        // clip y-axis
-  const double ymax = 1e-12;
+  const double Emax = 10.0;          // extend to 8 GeV
+  const double ymin = 1e-3;        // clip y-axis
+  const double ymax = 1e6;
   const char* OUT_FHC = "uboone_flux_FHC.pdf";
   const char* OUT_RHC = "uboone_flux_RHC.pdf";
   // ---------------------------------------------------
