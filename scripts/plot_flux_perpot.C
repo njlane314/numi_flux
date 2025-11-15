@@ -11,6 +11,7 @@
 #include "TLegend.h"
 #include "TLatex.h"
 #include "TStyle.h"
+#include "TROOT.h"
 #include "TMath.h"
 #include <algorithm>
 #include <iostream>
@@ -58,9 +59,10 @@ namespace {
     const int nbins = std::max(1, int(std::floor((Emax - Emin)/dE_GeV + 0.5)));
     fs.nbins = nbins;
 
+    gROOT->cd();
+
     auto make = [&](const char* name){
       auto* h = new TH1D(name,"",nbins,Emin,Emax);
-      h->SetDirectory(nullptr);
       h->Sumw2();
       return h;
     };
@@ -72,7 +74,7 @@ namespace {
 
     // Helper to fill one histogram with a PDG selection
     auto fill = [&](TH1D* h, int pdg){
-      ch.Draw(Form("nuE>>%s", h->GetName()),
+      ch.Draw(Form("nuE>>+%s", h->GetName()),
               Form("(%g<=nuE && nuE<%g) * (ntype==%d) * %s",Emin,Emax,pdg,w),
               "goff");
     };
@@ -115,7 +117,6 @@ namespace {
     // Axis cosmetics on a "frame" copy (use νμ to define axes)
     TH1D* frame = (TH1D*)fs.h_numu->Clone("frame");
     frame->Reset("ICES");
-    frame->SetDirectory(nullptr);
     frame->GetXaxis()->SetTitle("Neutrino Energy [GeV]");
     frame->GetYaxis()->SetTitle("#nu / POT / 10 MeV / cm^{2}");
     frame->GetXaxis()->SetLabelSize(drawXAxis ? 0.045 : 0.0);
@@ -180,7 +181,7 @@ void plot_flux_perpot(const char* fhc_inpat,
                       const char* outname = "flux_FHC_RHC.pdf")
 {
   gStyle->SetOptStat(0);
-  TH1::AddDirectory(kFALSE);
+  TH1::AddDirectory(kTRUE);
 
   // Build flux histograms for each running mode
   FluxSet FHC = BuildFluxSet(fhc_inpat, Emin, Emax);
