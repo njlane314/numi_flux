@@ -116,7 +116,7 @@ void plot_flux_minimal() {
   auto style_line = [](TH1* h, int col, int ls){
     h->SetLineColor(col);
     h->SetLineStyle(ls);
-    h->SetLineWidth(2);
+    h->SetLineWidth(1);
     h->SetMarkerSize(0);
   };
 
@@ -228,6 +228,22 @@ void plot_flux_minimal() {
     h_anumu->Draw("HIST SAME");
     h_anue ->Draw("HIST SAME");
 
+    // ---- header + POT note IN THE MAIN PAD (not in legend pad) ----
+    {
+      // anchor near the top-left inside the plotting area
+      const double xL = p_main->GetLeftMargin() + 0.01;
+      const double yT = 1.0 - p_main->GetTopMargin() - 0.01;
+
+      TLatex hdrTL;
+      hdrTL.SetNDC(); hdrTL.SetTextFont(62); hdrTL.SetTextSize(0.045);
+      hdrTL.DrawLatex(xL, yT, Form("%s Mode", tag));
+
+      TLatex potTL;
+      potTL.SetNDC(); potTL.SetTextFont(42); potTL.SetTextSize(0.035);
+      potTL.SetTextColor(kGray+2); potTL.SetTextAlign(13);
+      potTL.DrawLatex(xL, yT - 0.06, Form("POT in inputs: %.3g", pot_total));
+    }
+
     // ---- legend pad on top ----
     p_leg->cd();
 
@@ -240,22 +256,18 @@ void plot_flux_minimal() {
     const double s_tot   = std::max(1e-300, s_numu+s_anumu+s_nue+s_anue);
     auto pct = [&](double x){ return 100.0*x/s_tot; };
 
-    // Optional header on the left
-    TLatex hdr; hdr.SetNDC(); hdr.SetTextFont(62); hdr.SetTextSize(0.070);
-    hdr.DrawLatex(0.12, 0.86, Form("%s Mode", tag));
-    TLatex pot; pot.SetNDC(); pot.SetTextFont(42); pot.SetTextSize(0.045); pot.SetTextColor(kGray+2);
-    pot.DrawLatex(0.12, 0.66, Form("POT in inputs: %.3g", pot_total));
-
-    // Legend block (right/top), 2 columns, row-wise pairing
-    // Narrower box + margin so line samples are a sensible length
-    TLegend* L = new TLegend(0.48, 0.20, 0.97, 0.92);
+    // Legend ONLY in the top pad (no header/POT here).
+    // Wide box + large margin -> long swatches; 2 columns with ν/ν̄ pairing.
+    TLegend* L = new TLegend(0.06, 0.12, 0.96, 0.92);
     L->SetBorderSize(0);
     L->SetFillStyle(0);
     L->SetTextFont(42);
-    L->SetTextSize(0.055);
+    L->SetTextSize(0.060);
     L->SetNColumns(2);
-    L->SetColumnSeparation(0.07);
-    L->SetMargin(0.18);  // space between sample and text
+    L->SetColumnSeparation(0.10);
+    L->SetEntrySeparation(0.01);
+    // Large internal margin allocates a wider symbol column -> longer line samples
+    L->SetMargin(0.30);
 
     // *** ORDER MATTERS ***
     // Add entries in [νμ, ν̄μ, νe, ν̄e] so each row pairs ν with ν̄
