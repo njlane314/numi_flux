@@ -267,22 +267,6 @@ void plot_flux_minimal() {
     h_anumu->Draw("HIST SAME");
     h_anue ->Draw("HIST SAME");
 
-    // ---- header + POT note IN THE MAIN PAD (not in legend pad) ----
-    {
-      // anchor near the top-left inside the plotting area
-      const double xL = p_main->GetLeftMargin() + 0.01;
-      const double yT = 1.0 - p_main->GetTopMargin() - 0.01;
-
-      TLatex hdrTL;
-      hdrTL.SetNDC(); hdrTL.SetTextFont(62); hdrTL.SetTextSize(0.045);
-      hdrTL.DrawLatex(xL, yT, Form("%s Mode", tag));
-
-      TLatex potTL;
-      potTL.SetNDC(); potTL.SetTextFont(42); potTL.SetTextSize(0.035);
-      potTL.SetTextColor(kGray+2); potTL.SetTextAlign(13);
-      potTL.DrawLatex(xL, yT - 0.06, Form("POT in inputs: %.3g", pot_total));
-    }
-
     // ---- legend pad on top ----
     p_leg->cd();
 
