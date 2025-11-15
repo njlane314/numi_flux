@@ -1,9 +1,9 @@
-export QUALS=e26:prof
+export QUALS=e15:prof
 
-export GCC=v9_3_0
-export ROOT=v6_26_06b
-export BOOST=v1_66_0a
-export DK2NU_VER=v01_10_01d
+export GCC=v6_4_0
+export ROOT=v6_12_06a
+export BOOST=v1_66_0
+export DK2NU_VER=v01_05_01b
 export PPFX_VER=v02_18_02
 
 export FLUGG_FHC_DIR=
