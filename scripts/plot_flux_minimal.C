@@ -10,6 +10,7 @@
 #include "TStyle.h"
 #include "TROOT.h"
 #include "TString.h"
+#include "TGaxis.h"
 #include <algorithm>
 #include <iostream>
 #include <string>
@@ -17,7 +18,55 @@
 #include <cmath>
 #include <limits>
 
+// -----------------------------
+// Global style (verbatim settings from your Plotter::set_global_style)
+// -----------------------------
+static void set_global_style() {
+  const int font_style = 42;
+  TStyle* style = new TStyle("PlotterStyle", "Plotter Style");
+  style->SetTitleFont(font_style, "X");
+  style->SetTitleFont(font_style, "Y");
+  style->SetTitleFont(font_style, "Z");
+  style->SetTitleSize(0.04, "X");
+  style->SetTitleSize(0.04, "Y");
+  style->SetTitleSize(0.05, "Z");
+  style->SetLabelFont(font_style, "X");
+  style->SetLabelFont(font_style, "Y");
+  style->SetLabelFont(font_style, "Z");
+  style->SetLabelSize(0.045, "X");
+  style->SetLabelSize(0.045, "Y");
+  style->SetLabelSize(0.045, "Z");
+  style->SetLabelOffset(0.005, "X");
+  style->SetLabelOffset(0.005, "Y");
+  style->SetLabelOffset(0.005, "Z");
+  style->SetTitleOffset(1.10, "X");
+  style->SetTitleOffset(1.10, "Y");
+  style->SetOptStat(0);
+  style->SetOptTitle(0);
+  style->SetPadTickX(1);
+  style->SetPadTickY(1);
+  TGaxis::SetMaxDigits(4);
+  style->SetPadLeftMargin(0.15);
+  style->SetPadRightMargin(0.05);
+  style->SetPadTopMargin(0.07);
+  style->SetPadBottomMargin(0.12);
+  style->SetMarkerSize(1.0);
+  style->SetCanvasColor(0);
+  style->SetPadColor(0);
+  style->SetFrameFillColor(0);
+  style->SetCanvasBorderMode(0);
+  style->SetPadBorderMode(0);
+  style->SetStatColor(0);
+  style->SetFrameBorderMode(0);
+  style->SetTitleFillColor(0);
+  style->SetTitleBorderSize(0);
+  gROOT->SetStyle("PlotterStyle");
+  gROOT->ForceStyle();
+}
+
 void plot_flux_minimal() {
+  set_global_style();
+
   // ---------------- hardcoded choices ----------------
   const char* FHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_fhc_ppfx_g4_10_4.root";
   const char* RHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_rhc_ppfx_g4_10_4.root";
@@ -25,12 +74,8 @@ void plot_flux_minimal() {
   const double Emin = 0.0;
   const double Emax = 10.0;
 
-  // We want 25 MeV/bin:
+  // 25 MeV/bin to match requested units
   const double dE = 0.025;                  // GeV  (25 MeV)
-
-  // fallback y-range (will be overridden by auto scaling below)
-  const double ymin_fallback = 1e-8;
-  const double ymax_fallback = 1e+6;
 
   const char* OUT_FHC = "uboone_flux_FHC.pdf";
   const char* OUT_RHC = "uboone_flux_RHC.pdf";
@@ -41,10 +86,11 @@ void plot_flux_minimal() {
   constexpr double NOMINAL_POT  = 6e20;
   // ---------------------------------------------------
 
-  gStyle->SetOptStat(0);
   TH1::AddDirectory(kTRUE);
 
   const int nbins = std::max(1, int((Emax - Emin)/dE + 0.5));
+  const double binwGeV = (Emax - Emin) / nbins;
+  const int    binwMeV = (int)std::lround(binwGeV * 1000.0);
 
   auto fresh = [&](const char* name) {
     if (auto* old = dynamic_cast<TH1D*>(gROOT->FindObject(name))) delete old;
@@ -67,31 +113,30 @@ void plot_flux_minimal() {
     return tot;
   };
 
-  auto style = [](TH1* h, int col, int ls){
+  auto style_line = [](TH1* h, int col, int ls){
     h->SetLineColor(col);
     h->SetLineStyle(ls);
-    h->SetLineWidth(2);
+    h->SetLineWidth(3);
     h->SetMarkerSize(0);
   };
 
-  auto set_logy_limits = [&](TH1* frame, std::initializer_list<TH1*> hs){
+  auto auto_logy_limits = [&](TH1* frame, std::initializer_list<TH1*> hs){
     double minpos = std::numeric_limits<double>::infinity();
     double maxval = 0.0;
     for (TH1* h : hs) {
       for (int b=1; b<=h->GetNbinsX(); ++b) {
-        double y = h->GetBinContent(b);
+        const double y = h->GetBinContent(b);
         if (y>0.0 && y<minpos) minpos = y;
         if (y>maxval)          maxval = y;
       }
     }
-    if (!std::isfinite(minpos)) minpos = ymin_fallback;
-    if (maxval<=0.0)            maxval = ymax_fallback;
+    if (!std::isfinite(minpos)) minpos = 1e-18;
+    if (maxval<=0.0)            maxval = 1.0;
     frame->SetMinimum(std::max(1e-30, minpos*0.8));   // must be >0 for log
-    frame->SetMaximum(maxval*5.0);
+    frame->SetMaximum(maxval*6.0);
   };
 
   auto make_and_draw = [&](const char* file, const char* tag, const char* outname){
-    // ----- build spectra -----
     TChain ch("outTree"); ch.Add(file);
 
     const bool has_wgt  = ch.GetListOfBranches()->FindObject("wgt");
@@ -117,6 +162,7 @@ void plot_flux_minimal() {
       std::snprintf(w_scaled, sizeof(w_scaled), "%s", w.Data());
     }
 
+    // Build spectra
     TH1D* h_numu  = fresh(Form("h_numu_%s",  tag));
     TH1D* h_anumu = fresh(Form("h_anumu_%s", tag));
     TH1D* h_nue   = fresh(Form("h_nue_%s",   tag));
@@ -132,24 +178,49 @@ void plot_flux_minimal() {
     fill(h_nue,   12);
     fill(h_anue, -12);
 
-    // ----- style + frame -----
-    style(h_numu,  kRed+1, 1);
-    style(h_nue,   kRed+1, 2);
-    style(h_anumu, kBlue+2,1);
-    style(h_anue,  kBlue+2,3);
+    // Lines & colors (ν in red, ν̄ in blue; e-flavors dashed/dotted)
+    style_line(h_numu,  kRed+1, 1);
+    style_line(h_nue,   kRed+1, 2);
+    style_line(h_anumu, kBlue+2,1);
+    style_line(h_anue,  kBlue+2,3);
 
-    TCanvas c(Form("c_%s",tag), Form("%s Mode",tag), 900, 600);
-    c.SetLogy();
+    // -----------------------------
+    // Canvas with "legend on top" pad like rarexsec style
+    // -----------------------------
+    TCanvas c(Form("c_%s",tag), Form("%s Mode",tag), 900, 700);
 
+    const double split = 0.83; // bottom main pad up to here, legend pad on top
+    TPad* p_main = new TPad("pad_main","pad_main", 0., 0.00, 1., split);
+    TPad* p_leg  = new TPad("pad_legend","pad_legend", 0., split, 1., 1.00);
+
+    // match margins to your style
+    p_main->SetTopMargin(0.02);
+    p_main->SetBottomMargin(0.12);
+    p_main->SetLeftMargin(0.15);
+    p_main->SetRightMargin(0.05);
+    p_main->SetLogy();
+
+    p_leg->SetTopMargin(0.15);
+    p_leg->SetBottomMargin(0.05);
+    p_leg->SetLeftMargin(0.02);
+    p_leg->SetRightMargin(0.02);
+
+    p_main->Draw();
+    p_leg->Draw();
+
+    // ---- draw main pad ----
+    p_main->cd();
+
+    // Frame with exact axis titles
     TH1D* frame = (TH1D*)h_numu->Clone(Form("frame_%s",tag));
     frame->Reset("ICES");
     frame->GetXaxis()->SetTitle("Neutrino Energy [GeV]");
 
-    // Axis label that exactly matches the bin width and 6e20 scaling:
-    const double dE_MeV = dE * 1000.0;
-    frame->GetYaxis()->SetTitle(Form("#nu / 6#times10^{20} POT / %.0f MeV / cm^{2}", dE_MeV));
+    TString potLabel = NORM_PER_POT ? "POT" : "6 #times 10^{20} POT";
+    TString yTitle = Form("#nu / %s / %d MeV / cm^{2}", potLabel.Data(), binwMeV);
+    frame->GetYaxis()->SetTitle(yTitle);
 
-    set_logy_limits(frame, {h_numu, h_anumu, h_nue, h_anue});
+    auto_logy_limits(frame, {h_numu, h_anumu, h_nue, h_anue});
     frame->Draw("AXIS");
 
     h_numu ->Draw("HIST SAME");
@@ -157,6 +228,13 @@ void plot_flux_minimal() {
     h_anumu->Draw("HIST SAME");
     h_anue ->Draw("HIST SAME");
 
+    // ---- top legend pad (rarexsec style) ----
+    p_leg->cd();
+    // decide columns based on entries
+    const int n_entries = 4; // we always draw 4 curves here
+    const int n_cols = (n_entries > 4) ? 3 : 2;
+
+    // Fill fractions for legend text
     auto integ = [&](const TH1D* h){ return h->Integral(1, nbins); };
     const double s_numu  = integ(h_numu);
     const double s_anumu = integ(h_anumu);
@@ -165,30 +243,43 @@ void plot_flux_minimal() {
     const double s_tot   = std::max(1e-300, s_numu+s_anumu+s_nue+s_anue);
     auto pct = [&](double x){ return 100.0*x/s_tot; };
 
-    TLegend L(0.62, 0.67, 0.935, 0.92);
-    L.SetBorderSize(0); L.SetFillStyle(0); L.SetTextSize(0.038);
-    L.AddEntry(h_numu,  Form("#nu_{#mu} (%.1f%%)",       pct(s_numu)),  "l");
-    L.AddEntry(h_nue,   Form("#nu_{e} (%.1f%%)",         pct(s_nue)),   "l");
-    L.AddEntry(h_anumu, Form("#bar{#nu}_{#mu} (%.1f%%)", pct(s_anumu)), "l");
-    L.AddEntry(h_anue,  Form("#bar{#nu}_{e} (%.1f%%)",   pct(s_anue)),  "l");
-    L.Draw();
+    // Wide legend across the top pad
+    TLegend* L = new TLegend(0.10, 0.08, 0.98, 0.95);
+    L->SetNColumns(n_cols);
+    L->SetBorderSize(0);
+    L->SetFillStyle(0);
+    L->SetTextFont(42);
+    L->SetTextSize(0.06);
 
-    TLatex t; t.SetNDC(); t.SetTextFont(42);
-    t.SetTextSize(0.05); t.SetTextColor(kGray+2);
-    t.DrawLatex(0.16, 0.90, Form("%s Mode", tag));
-    t.SetTextSize(0.035); t.SetTextColor(kGray+1);
-    t.DrawLatex(0.16, 0.84, Form("POT in inputs: %.3g", std::max(0.0, sumPOT(ch))));
+    L->AddEntry(h_numu,  Form("#nu_{#mu} (%.1f%%)",       pct(s_numu)),  "l");
+    L->AddEntry(h_anumu, Form("#bar{#nu}_{#mu} (%.1f%%)", pct(s_anumu)), "l");
+    L->AddEntry(h_nue,   Form("#nu_{e} (%.1f%%)",         pct(s_nue)),   "l");
+    L->AddEntry(h_anue,  Form("#bar{#nu}_{e} (%.1f%%)",   pct(s_anue)),  "l");
+    L->Draw();
 
-    // small printout to confirm bin width actually used
-    std::cout << "[plot_flux_minimal] " << tag
-              << ": bin width = " << h_numu->GetBinWidth(1) << " GeV ("
-              << h_numu->GetBinWidth(1)*1000.0 << " MeV), "
-              << (NORM_PER_POT ? "per-POT" : "scaled to 6e20 POT") << "\n";
+    // Optional subtle header on the left of the legend pad
+    TLatex t;
+    t.SetNDC(); t.SetTextFont(62); t.SetTextSize(0.065);
+    t.DrawLatex(0.12, 0.96, Form("%s Mode", tag));
+    t.SetTextFont(42); t.SetTextSize(0.045); t.SetTextColor(kGray+2);
+    t.DrawLatex(0.12, 0.02, Form("POT in inputs: %.3g", std::max(0.0, sumPOT(ch))));
 
+    // ---- save ----
+    c.cd();
+    c.Update();
     c.SaveAs(outname);
 
+    // cleanup
     delete frame;
+    delete L;
+    delete p_main;
+    delete p_leg;
     delete h_numu; delete h_anumu; delete h_nue; delete h_anue;
+
+    std::cout << "[plot_flux_minimal] " << tag
+              << ": bin width = " << binwGeV << " GeV (" << binwMeV << " MeV), "
+              << (NORM_PER_POT ? "per-POT" : "scaled to 6e20 POT")
+              << " | y-axis: " << yTitle << "\n";
   };
 
   make_and_draw(FHC_FILE, "FHC", OUT_FHC);
