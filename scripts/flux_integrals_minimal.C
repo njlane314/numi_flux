@@ -59,11 +59,20 @@ static void run_mode(const char *file, const char *tag,
   ch.Add(file);
 
   const bool has_wgt  = ch.GetListOfBranches()->FindObject("wgt");
-  const bool has_ppfx = ch.GetListOfBranches()->FindObject("wgt_ppfx");
+  const bool has_ppfx_cv  = ch.GetListOfBranches()->FindObject("ppfx_cv") ||
+                            ch.GetListOfBranches()->FindObject("wgt_ppfx_cv");
+  const bool has_ppfx_vec = ch.GetListOfBranches()->FindObject("wgt_ppfx");
 
   // Base weight: geometry/acceptance * (optional) PPFX CV
   TString w = has_wgt ? "wgt" : "1";
-  if (has_ppfx) w += "*wgt_ppfx";
+  if (has_ppfx_cv) {
+    // Prefer an explicit CV scalar if present
+    w += Form("*%s",
+              ch.GetListOfBranches()->FindObject("ppfx_cv") ? "ppfx_cv" : "wgt_ppfx_cv");
+  } else if (has_ppfx_vec) {
+    // Fall back to the first element of the vector (conventionally CV)
+    w += "*wgt_ppfx[0]";
+  }
 
   // Build scaled weight expression
   const double pot_total = sumPOT(ch);
@@ -96,7 +105,7 @@ static void run_mode(const char *file, const char *tag,
   std::printf("Energy window   : %.3f – %.3f GeV\n", Emin, Emax);
   std::printf("Normalization   : %s%s\n",
               norm_per_pot ? "per POT" : "scaled to 6e20 POT",
-              has_ppfx ? " (includes PPFX CV)" : "");
+              (has_ppfx_cv || has_ppfx_vec) ? " (includes PPFX CV)" : "");
   std::printf("Integrated flux (units = %s):\n", units);
   std::printf("  nu_mu     : %.6e\n", I_numu);
   std::printf("  nubar_mu  : %.6e\n", I_anumu);
