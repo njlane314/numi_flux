@@ -116,7 +116,7 @@ void plot_flux_minimal() {
   auto style_line = [](TH1* h, int col, int ls){
     h->SetLineColor(col);
     h->SetLineStyle(ls);
-    h->SetLineWidth(3);
+    h->SetLineWidth(2);
     h->SetMarkerSize(0);
   };
 
@@ -228,13 +228,10 @@ void plot_flux_minimal() {
     h_anumu->Draw("HIST SAME");
     h_anue ->Draw("HIST SAME");
 
-    // ---- top legend pad (rarexsec style) ----
+    // ---- legend pad on top ----
     p_leg->cd();
-    // decide columns based on entries
-    const int n_entries = 4; // we always draw 4 curves here
-    const int n_cols = (n_entries > 4) ? 3 : 2;
 
-    // Fill fractions for legend text
+    // percentages for labels
     auto integ = [&](const TH1D* h){ return h->Integral(1, nbins); };
     const double s_numu  = integ(h_numu);
     const double s_anumu = integ(h_anumu);
@@ -243,26 +240,31 @@ void plot_flux_minimal() {
     const double s_tot   = std::max(1e-300, s_numu+s_anumu+s_nue+s_anue);
     auto pct = [&](double x){ return 100.0*x/s_tot; };
 
-    // Wide legend across the top pad
-    TLegend* L = new TLegend(0.10, 0.08, 0.98, 0.95);
-    L->SetNColumns(n_cols);
+    // Optional header on the left
+    TLatex hdr; hdr.SetNDC(); hdr.SetTextFont(62); hdr.SetTextSize(0.070);
+    hdr.DrawLatex(0.12, 0.86, Form("%s Mode", tag));
+    TLatex pot; pot.SetNDC(); pot.SetTextFont(42); pot.SetTextSize(0.045); pot.SetTextColor(kGray+2);
+    pot.DrawLatex(0.12, 0.66, Form("POT in inputs: %.3g", pot_total));
+
+    // Legend block (right/top), 2 columns, row-wise pairing
+    // Narrower box + margin so line samples are a sensible length
+    TLegend* L = new TLegend(0.48, 0.20, 0.97, 0.92);
     L->SetBorderSize(0);
     L->SetFillStyle(0);
     L->SetTextFont(42);
-    L->SetTextSize(0.06);
+    L->SetTextSize(0.055);
+    L->SetNColumns(2);
+    L->SetColumnSeparation(0.07);
+    L->SetMargin(0.18);  // space between sample and text
 
-    L->AddEntry(h_numu,  Form("#nu_{#mu} (%.1f%%)",       pct(s_numu)),  "l");
+    // *** ORDER MATTERS ***
+    // Add entries in [νμ, ν̄μ, νe, ν̄e] so each row pairs ν with ν̄
+    L->AddEntry(h_numu , Form("#nu_{#mu} (%.1f%%)",       pct(s_numu)),  "l");
     L->AddEntry(h_anumu, Form("#bar{#nu}_{#mu} (%.1f%%)", pct(s_anumu)), "l");
-    L->AddEntry(h_nue,   Form("#nu_{e} (%.1f%%)",         pct(s_nue)),   "l");
-    L->AddEntry(h_anue,  Form("#bar{#nu}_{e} (%.1f%%)",   pct(s_anue)),  "l");
-    L->Draw();
+    L->AddEntry(h_nue  , Form("#nu_{e} (%.1f%%)",         pct(s_nue)),   "l");
+    L->AddEntry(h_anue , Form("#bar{#nu}_{e} (%.1f%%)",   pct(s_anue)),  "l");
 
-    // Optional subtle header on the left of the legend pad
-    TLatex t;
-    t.SetNDC(); t.SetTextFont(62); t.SetTextSize(0.065);
-    t.DrawLatex(0.12, 0.96, Form("%s Mode", tag));
-    t.SetTextFont(42); t.SetTextSize(0.045); t.SetTextColor(kGray+2);
-    t.DrawLatex(0.12, 0.02, Form("POT in inputs: %.3g", std::max(0.0, sumPOT(ch))));
+    L->Draw();
 
     // ---- save ----
     c.cd();
