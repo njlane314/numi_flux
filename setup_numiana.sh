@@ -35,7 +35,7 @@ maybe_setup gcc  "${GCC:-}"
 maybe_setup root "${ROOT:-}" ${QUALS:+-q "$QUALS"}
 maybe_setup boost "${BOOST:-}" ${QUALS:+-q "$QUALS"}
 maybe_setup dk2nu "${DK2NU_VER:-}" ${QUALS:+-q "$QUALS"}
-maybe_setup ppfx  "${PPFX_VER:-}" ${QUALS:+-q "$QUALS"}
+maybe_setup ppfx v02_18_02 -q e26:prof
 export NUMIANA_DIR="${NUMIANA_DIR:-$PWD}"
 export NUMIANA_INC="$NUMIANA_DIR/include"
 export BOOSTROOT="${BOOST_INC:-$BOOSTROOT}"
