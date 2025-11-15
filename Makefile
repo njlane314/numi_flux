@@ -1,5 +1,7 @@
 INCLUDES = -I$(shell root-config --incdir) -I$(NUMIANA_INC)
-DK2NU_INCLUDES = -I$(PPFX_DIR)/include -I$(shell root-config --incdir) -I$(BOOSTROOT) -I${DK2NU}/include -I$(NUMIANA_INC)
+DK2NU_INCLUDES = -I$(PPFX_INC) -I$(PPFX_INC)/include \
+                 -I$(shell root-config --incdir) \
+                 -I$(BOOSTROOT) -I${DK2NU}/include -I$(NUMIANA_INC)
 DEPLIBS=$(shell root-config --libs)
 
 CC	=	g++
