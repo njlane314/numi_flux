@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+#set -e
 cd "$(dirname "$0")"
 #source ./setup_numiana.sh
 if ! command -v root-config >/dev/null 2>&1; then
