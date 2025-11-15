@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cmath>
 #include <limits>
+#include <cstring>
 
 // ------------------------------------------------------------------
 // Sum POT by reading the "POT" histogram in each file in the TChain.
@@ -41,13 +42,16 @@ static double integrate_flux(TChain &ch,
                              const char *wexpr,
                              const char *tag)
 {
-  TString hname = Form("h_int_%s_%d", tag, pdg);
-  TH1D h(hname, "", 1, 0., 1.);
-  h.Sumw2();
-  ch.Draw(Form("0.5>>%s", hname.Data()),
-          Form("(%g<=nuE && nuE<%g) * (ntype==%d) * (%s)", Emin, Emax, pdg, wexpr),
-          "goff");
-  return h.GetBinContent(1);
+  // Let ROOT create the 1-bin histogram inline; retrieve it via GetHistogram().
+  // This is robust even with TH1::AddDirectory(kFALSE).
+  const TString drawspec = Form("0.5>>h_int_tmp_%s_%d(1,0,1)", tag, pdg);
+  const TString cut      = Form("(%g<=nuE && nuE<%g) * (ntype==%d) * (%s)",
+                                Emin, Emax, pdg, wexpr);
+  ch.Draw(drawspec, cut, "goff");
+  TH1 *h = ch.GetHistogram();
+  const double sumw = h ? h->GetBinContent(1) : 0.0;
+  if (h) delete h; // avoid leaking histograms created by Draw
+  return sumw;
 }
 
 // ------------------------------------------------------------------
@@ -109,7 +113,18 @@ static void run_mode(const char *file, const char *tag,
   TString ppfx = "";
   if (has("ppfx_cv"))          ppfx = "ppfx_cv";
   else if (has("wgt_ppfx_cv")) ppfx = "wgt_ppfx_cv";
-  else if (has("wgt_ppfx"))    ppfx = "wgt_ppfx[0]";  // vector → CV in [0] by convention
+  else {
+    // Decide if wgt_ppfx is a vector/array or a scalar. If it's a scalar,
+    // using [0] would zero out the weight selection.
+    if (auto *bppfx = ch.GetBranch("wgt_ppfx")) {
+      const char *cls = bppfx->GetClassName();
+      if (cls && std::strstr(cls, "vector")) {
+        ppfx = "wgt_ppfx[0]";   // convention: [0] is CV
+      } else {
+        ppfx = "wgt_ppfx";      // scalar branch
+      }
+    }
+  }
   if (!ppfx.IsNull()) w += "*" + ppfx;
 
   const double pot_total = sumPOT(ch);
@@ -162,7 +177,7 @@ static void run_mode(const char *file, const char *tag,
   std::printf("  TOTAL     : %.6e\n", I_tot);
 
   if (I_tot > 0.0) {
-    std::printf("Fractions (% of total): "
+    std::printf("Fractions (%% of total): "
                 "nu_mu %.2f%% | nubar_mu %.2f%% | nu_e %.2f%% | nubar_e %.2f%%\n",
                 100.0*I_numu/I_tot, 100.0*I_anumu/I_tot,
                 100.0*I_nue/I_tot,  100.0*I_anue/I_tot);
