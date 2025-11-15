@@ -3,6 +3,7 @@
 #include "TChain.h"
 #include "TFile.h"
 #include "TH1D.h"
+#include "TH1.h"
 #include "TChainElement.h"
 #include "TCanvas.h"
 #include "TLegend.h"
@@ -62,6 +63,44 @@ static void set_global_style() {
   style->SetTitleBorderSize(0);
   gROOT->SetStyle("PlotterStyle");
   gROOT->ForceStyle();
+}
+
+// --------------------------------------------------------------------
+// Legend helper: implement the legend like StackedHistogramPlot::buildLegend
+// --------------------------------------------------------------------
+static TLegend* build_flux_legend_like_stacked(
+    TPad* p_leg,
+    TH1* h_numu, TH1* h_anumu, TH1* h_nue, TH1* h_anue,
+    double split,                 // main/legend vertical split (0..1)
+    double s_numu, double s_anumu, double s_nue, double s_anue, double s_tot)
+{
+  p_leg->cd();
+
+  // Same geometry and styling approach as in StackedHistogramPlot
+  TLegend* L = new TLegend(0.12, 0.00, 0.95, 0.75);
+  L->SetBorderSize(0);
+  L->SetFillStyle(0);
+  L->SetTextFont(42);
+
+  const int n_entries = 4; // νμ, ν̄μ, νe, ν̄e
+  int n_cols = (n_entries > 4) ? 3 : 2;
+  L->SetNColumns(n_cols);
+  L->SetColumnSeparation(0.08);
+  L->SetEntrySeparation(0.00);
+  L->SetMargin(0.25);
+
+  // Scale text so it visually matches main-pad label sizes
+  // (legend pad height is (1 - split) of the canvas height).
+  const double s_main = 0.045;                // typical label size in main pad
+  const double s_leg  = s_main * (split / (1.0 - split));
+  L->SetTextSize(s_leg);
+
+  auto pct = [&](double x){ return (s_tot>0 ? 100.0*x/s_tot : 0.0); };
+  L->AddEntry(h_numu , Form("#nu_{#mu} (%.1f%%)",       pct(s_numu)),  "l");
+  L->AddEntry(h_anumu, Form("#bar{#nu}_{#mu} (%.1f%%)", pct(s_anumu)), "l");
+  L->AddEntry(h_nue  , Form("#nu_{e} (%.1f%%)",         pct(s_nue)),   "l");
+  L->AddEntry(h_anue , Form("#bar{#nu}_{e} (%.1f%%)",   pct(s_anue)),  "l");
+  return L;
 }
 
 void plot_flux_minimal() {
@@ -189,19 +228,19 @@ void plot_flux_minimal() {
     // -----------------------------
     TCanvas c(Form("c_%s",tag), Form("%s Mode",tag), 900, 700);
 
-    const double split = 0.83; // bottom main pad up to here, legend pad on top
+    const double split = 0.85; // match StackedHistogramPlot split (legend ~15% tall)
     TPad* p_main = new TPad("pad_main","pad_main", 0., 0.00, 1., split);
     TPad* p_leg  = new TPad("pad_legend","pad_legend", 0., split, 1., 1.00);
 
-    // match margins to your style
-    p_main->SetTopMargin(0.02);
+    // match margins to StackedHistogramPlot::setupPads
+    p_main->SetTopMargin(0.01);
     p_main->SetBottomMargin(0.12);
-    p_main->SetLeftMargin(0.15);
+    p_main->SetLeftMargin(0.12);
     p_main->SetRightMargin(0.05);
     p_main->SetLogy();
 
-    p_leg->SetTopMargin(0.15);
-    p_leg->SetBottomMargin(0.05);
+    p_leg->SetTopMargin(0.05);
+    p_leg->SetBottomMargin(0.01);
     p_leg->SetLeftMargin(0.02);
     p_leg->SetRightMargin(0.02);
 
@@ -247,34 +286,19 @@ void plot_flux_minimal() {
     // ---- legend pad on top ----
     p_leg->cd();
 
-    // percentages for labels
+    // percentages for labels (for legend text)
     auto integ = [&](const TH1D* h){ return h->Integral(1, nbins); };
     const double s_numu  = integ(h_numu);
     const double s_anumu = integ(h_anumu);
     const double s_nue   = integ(h_nue);
     const double s_anue  = integ(h_anue);
     const double s_tot   = std::max(1e-300, s_numu+s_anumu+s_nue+s_anue);
-    auto pct = [&](double x){ return 100.0*x/s_tot; };
-
-    // Legend ONLY in the top pad (no header/POT here).
-    // Wide box + large margin -> long swatches; 2 columns with ν/ν̄ pairing.
-    TLegend* L = new TLegend(0.06, 0.12, 0.96, 0.92);
-    L->SetBorderSize(0);
-    L->SetFillStyle(0);
-    L->SetTextFont(42);
-    L->SetTextSize(0.060);
-    L->SetNColumns(2);
-    L->SetColumnSeparation(0.10);
-    L->SetEntrySeparation(0.01);
-    // Large internal margin allocates a wider symbol column -> longer line samples
-    L->SetMargin(0.30);
-
-    // *** ORDER MATTERS ***
-    // Add entries in [νμ, ν̄μ, νe, ν̄e] so each row pairs ν with ν̄
-    L->AddEntry(h_numu , Form("#nu_{#mu} (%.1f%%)",       pct(s_numu)),  "l");
-    L->AddEntry(h_anumu, Form("#bar{#nu}_{#mu} (%.1f%%)", pct(s_anumu)), "l");
-    L->AddEntry(h_nue  , Form("#nu_{e} (%.1f%%)",         pct(s_nue)),   "l");
-    L->AddEntry(h_anue , Form("#bar{#nu}_{e} (%.1f%%)",   pct(s_anue)),  "l");
+    
+    // Build legend with the same geometry/behavior as StackedHistogramPlot
+    TLegend* L = build_flux_legend_like_stacked(
+        p_leg, h_numu, h_anumu, h_nue, h_anue,
+        split, s_numu, s_anumu, s_nue, s_anue, s_tot
+    );
 
     L->Draw();
 
