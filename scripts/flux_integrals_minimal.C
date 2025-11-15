@@ -4,8 +4,10 @@
 #include "TChainElement.h"
 #include "TFile.h"
 #include "TH1D.h"
+#include "TKey.h"
 #include "TROOT.h"
 #include "TString.h"
+#include "TTree.h"
 
 #include <cstdio>
 #include <cmath>
@@ -55,41 +57,96 @@ static void run_mode(const char *file, const char *tag,
                      double Emin, double Emax,
                      bool norm_per_pot, double nominal_pot)
 {
-  TChain ch("outTree");
-  ch.Add(file);
-
-  const bool has_wgt  = ch.GetListOfBranches()->FindObject("wgt");
-  const bool has_ppfx_cv  = ch.GetListOfBranches()->FindObject("ppfx_cv") ||
-                            ch.GetListOfBranches()->FindObject("wgt_ppfx_cv");
-  const bool has_ppfx_vec = ch.GetListOfBranches()->FindObject("wgt_ppfx");
-
-  // Base weight: geometry/acceptance * (optional) PPFX CV
-  TString w = has_wgt ? "wgt" : "1";
-  if (has_ppfx_cv) {
-    // Prefer an explicit CV scalar if present
-    w += Form("*%s",
-              ch.GetListOfBranches()->FindObject("ppfx_cv") ? "ppfx_cv" : "wgt_ppfx_cv");
-  } else if (has_ppfx_vec) {
-    // Fall back to the first element of the vector (conventionally CV)
-    w += "*wgt_ppfx[0]";
+  // --- pick a real tree name from the file ---
+  TString tname = "outTree";
+  {
+    TFile f(file, "READ");
+    if (!f.IsOpen()) {
+      std::fprintf(stderr, "[flux_integrals_minimal] ERROR: cannot open %s\n", file);
+      return;
+    }
+    auto exists_as_tree = [&](const char* nm){
+      if (auto *o = f.Get(nm)) return o->InheritsFrom(TTree::Class());
+      return false;
+    };
+    if (!exists_as_tree("outTree")) {
+      const char* cand[] = {"dk2nuTree","flux","NuMIFlux","Events","tree"};
+      for (auto nm : cand) {
+        if (exists_as_tree(nm)) { tname = nm; break; }
+      }
+      if (tname == "outTree") {
+        // fallback: first TTree in the file
+        TIter next(f.GetListOfKeys());
+        while (TKey *k = (TKey*)next()) {
+          if (TString(k->GetClassName()) == "TTree") { tname = k->GetName(); break; }
+        }
+      }
+    }
   }
 
-  // Build scaled weight expression
+  TChain ch(tname);
+  if (ch.Add(file) <= 0) {
+    std::fprintf(stderr, "[flux_integrals_minimal] ERROR: failed to add %s to chain '%s'\n",
+                 file, tname.Data());
+    return;
+  }
+
+  // --- create aliases so your selection terms still work ---
+  auto *br = ch.GetListOfBranches();
+  auto has = [&](const char* n){ return br && br->FindObject(n); };
+
+  if (!has("nuE")) {
+    const char* candE[] = {"Ev","Enu","E","enu"};
+    for (auto nm : candE) if (has(nm)) { ch.SetAlias("nuE", nm); break; }
+  }
+  if (!has("ntype")) {
+    const char* candP[] = {"pdg","nuPDG","pdg_nu","inu"};
+    for (auto nm : candP) if (has(nm)) { ch.SetAlias("ntype", nm); break; }
+  }
+
+  // --- build weight expression with robust PPFX CV handling ---
+  TString w = has("wgt") ? "wgt" : "1";
+  TString ppfx = "";
+  if (has("ppfx_cv"))          ppfx = "ppfx_cv";
+  else if (has("wgt_ppfx_cv")) ppfx = "wgt_ppfx_cv";
+  else if (has("wgt_ppfx"))    ppfx = "wgt_ppfx[0]";  // vector → CV in [0] by convention
+  if (!ppfx.IsNull()) w += "*" + ppfx;
+
   const double pot_total = sumPOT(ch);
-  TString w_scaled;
+  TString w_scaled = w;
   if (pot_total > 0.0) {
-    if (norm_per_pot) {
-      w_scaled.Form("(%s)/(%.*g)", w.Data(), 15, pot_total);             // per POT
-    } else {
-      w_scaled.Form("(%s)*(%.*g)", w.Data(), 15, nominal_pot/pot_total); // scaled to nominal_pot
-    }
+    if (norm_per_pot) w_scaled = Form("(%s)/%.15g", w.Data(), pot_total);
+    else              w_scaled = Form("(%s)*%.15g", w.Data(), nominal_pot/pot_total);
   } else {
     std::fprintf(stderr,
       "[flux_integrals_minimal] WARNING: POT<=0 in inputs; proceeding without POT scaling.\n");
-    w_scaled = w;
   }
 
-  // Integrate for each species
+  // --- sanity prints ---
+  const Long64_t nEntries = ch.GetEntries();
+  std::printf("\n================  %s mode  ================\n", tag);
+  std::printf("Input file      : %s\n", file);
+  std::printf("Tree name       : %s\n", tname.Data());
+  std::printf("Entries in tree : %lld\n", nEntries);
+  std::printf("POT in inputs   : %.6g\n", pot_total);
+  std::printf("Energy window   : %.3f – %.3f GeV\n", Emin, Emax);
+  std::printf("Normalization   : %s%s\n",
+              norm_per_pot ? "per POT" : "scaled to 6e20 POT",
+              ppfx.IsNull() ? "" : " (includes PPFX CV)");
+  if (nEntries == 0) {
+    std::fprintf(stderr, "[flux_integrals_minimal] ERROR: chain has 0 entries — wrong tree name.\n");
+    return;
+  }
+  if (!has("nuE") && !ch.GetAlias("nuE")) {
+    std::fprintf(stderr, "[flux_integrals_minimal] ERROR: cannot find energy branch (nuE/Ev/Enu/...)\n");
+    return;
+  }
+  if (!has("ntype") && !ch.GetAlias("ntype")) {
+    std::fprintf(stderr, "[flux_integrals_minimal] ERROR: cannot find PDG branch (ntype/pdg/...)\n");
+    return;
+  }
+
+  // --- integrate using your existing helper (still uses nuE & ntype) ---
   const double I_numu  = integrate_flux(ch,  +14, Emin, Emax, w_scaled.Data(), tag);
   const double I_anumu = integrate_flux(ch,  -14, Emin, Emax, w_scaled.Data(), tag);
   const double I_nue   = integrate_flux(ch,  +12, Emin, Emax, w_scaled.Data(), tag);
@@ -97,15 +154,6 @@ static void run_mode(const char *file, const char *tag,
   const double I_tot   = I_numu + I_anumu + I_nue + I_anue;
 
   const char *units = norm_per_pot ? "nu / POT / cm^2" : "nu / (6e20 POT) / cm^2";
-
-  // Print nicely
-  std::printf("\n================  %s mode  ================\n", tag);
-  std::printf("Input file      : %s\n", file);
-  std::printf("POT in inputs   : %.6g\n", pot_total);
-  std::printf("Energy window   : %.3f – %.3f GeV\n", Emin, Emax);
-  std::printf("Normalization   : %s%s\n",
-              norm_per_pot ? "per POT" : "scaled to 6e20 POT",
-              (has_ppfx_cv || has_ppfx_vec) ? " (includes PPFX CV)" : "");
   std::printf("Integrated flux (units = %s):\n", units);
   std::printf("  nu_mu     : %.6e\n", I_numu);
   std::printf("  nubar_mu  : %.6e\n", I_anumu);
