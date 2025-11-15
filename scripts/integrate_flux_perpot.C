@@ -4,6 +4,9 @@
 #include "TChainElement.h"
 #include <iostream>
 
+// root -l -b -q 'scripts/integrate_flux_perpot.C("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_fhc_ppfx_g4_10_4.root","FHC",0.25,5.0)'
+// root -l -b -q 'scripts/integrate_flux_perpot.C("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_rhc_ppfx_g4_10_4.root","RHC",0.25,5.0)'
+
 void integrate_flux_perpot(const char* inpat,
                            const char* mode="FHC",
                            double Emin=0.25, double Emax=5.0)
