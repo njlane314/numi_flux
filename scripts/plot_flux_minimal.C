@@ -9,19 +9,28 @@
 #include "TLatex.h"
 #include "TStyle.h"
 #include "TROOT.h"
+#include "TString.h"
 #include <algorithm>
 #include <iostream>
+#include <string>
+#include <cstdio>
 
 void plot_flux_minimal() {
   // ---------------- hardcoded choices ----------------
   const char* FHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_fhc_ppfx_g4_10_4.root";
   const char* RHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_rhc_ppfx_g4_10_4.root";
+
   const double Emin = 0.0;
-  const double Emax = 10.0;          // extend to 8 GeV
-  const double ymin = 1e-3;        // clip y-axis
+  const double Emax = 10.0;     // extend to 8 GeV if you like (bins stay 10 MeV)
+  const double ymin = 1e-3;     // y-axis clip
   const double ymax = 1e6;
+
   const char* OUT_FHC = "uboone_flux_FHC.pdf";
   const char* OUT_RHC = "uboone_flux_RHC.pdf";
+
+  // Normalization toggle: per POT (true) or scaled to 6e20 POT (false)
+  constexpr bool NORM_PER_POT = true;
+  constexpr double NOMINAL_POT = 6e20;
   // ---------------------------------------------------
 
   gStyle->SetOptStat(0);
@@ -62,8 +71,25 @@ void plot_flux_minimal() {
   auto make_and_draw = [&](const char* file, const char* tag, const char* outname){
     // ----- build spectra -----
     TChain ch("outTree"); ch.Add(file);
+
+    const bool has_wgt  = ch.GetListOfBranches()->FindObject("wgt");
     const bool has_ppfx = ch.GetListOfBranches()->FindObject("wgt_ppfx");
-    const char* w = has_ppfx ? "wgt_ppfx" : "wgt";
+
+    // (1) Combine geometry/acceptance with PPFX CV
+    std::string wexpr = has_wgt ? "wgt" : "1";
+    if (has_ppfx) wexpr += "*wgt_ppfx";
+
+    // (2) Scale by POT to match the axis label (per POT) or to 6e20 POT
+    const double pot_total = sumPOT(ch);
+    if (pot_total <= 0) {
+      std::cerr << "[plot_flux_minimal] WARNING: total POT <= 0; proceeding without POT scaling.\n";
+    }
+    char w_scaled[256];
+    if (NORM_PER_POT) {
+      std::snprintf(w_scaled, sizeof(w_scaled), "(%s)/(%g)", wexpr.c_str(), std::max(1e-30, pot_total));
+    } else {
+      std::snprintf(w_scaled, sizeof(w_scaled), "(%s)*(%g)", wexpr.c_str(), NOMINAL_POT / std::max(1e-30, pot_total));
+    }
 
     TH1D* h_numu  = fresh(Form("h_numu_%s",  tag));
     TH1D* h_anumu = fresh(Form("h_anumu_%s", tag));
@@ -72,7 +98,7 @@ void plot_flux_minimal() {
 
     auto fill = [&](TH1D* h, int pdg){
       ch.Draw(Form("nuE>>%s", h->GetName()),
-              Form("(%g<=nuE && nuE<%g) * (ntype==%d) * %s", Emin, Emax, pdg, w),
+              Form("(%g<=nuE && nuE<%g) * (ntype==%d) * %s", Emin, Emax, pdg, w_scaled),
               "goff");
     };
     fill(h_numu,  14);
@@ -92,7 +118,9 @@ void plot_flux_minimal() {
     TH1D* frame = (TH1D*)h_numu->Clone(Form("frame_%s",tag));
     frame->Reset("ICES");
     frame->GetXaxis()->SetTitle("Neutrino Energy [GeV]");
-    frame->GetYaxis()->SetTitle("#nu / POT / 10 MeV / cm^{2}");
+    frame->GetYaxis()->SetTitle(NORM_PER_POT ?
+      "#nu / POT / 10 MeV / cm^{2}" :
+      "#nu / 6e20 POT / 10 MeV / cm^{2}");
     frame->GetXaxis()->SetTitleSize(0.05);
     frame->GetXaxis()->SetLabelSize(0.045);
     frame->GetYaxis()->SetTitleSize(0.055);
@@ -127,7 +155,7 @@ void plot_flux_minimal() {
     t.SetTextSize(0.05); t.SetTextColor(kGray+2);
     t.DrawLatex(0.16, 0.90, Form("%s Mode", tag));
     t.SetTextSize(0.035); t.SetTextColor(kGray+1);
-    t.DrawLatex(0.16, 0.84, Form("POT in inputs: %.3g", sumPOT(ch)));
+    t.DrawLatex(0.16, 0.84, Form("POT in inputs: %.3g", pot_total));
 
     c.SaveAs(outname);
 
