@@ -2,6 +2,7 @@
 #include "TFile.h"
 #include "TH1D.h"
 #include "TChainElement.h"
+#include "TIter.h"
 #include <iostream>
 
 // root -l -b -q 'scripts/integrate_flux_perpot.C("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_fhc_ppfx_g4_10_4.root","FHC",0.25,5.0)'
@@ -28,11 +29,16 @@ void integrate_flux_perpot(const char* inpat,
   double sum = h.Integral(1, h.GetNbinsX());  // integrated μ-flavour flux in [Emin,Emax]
 
   // total POT in these inputs (for reference; result below is already per POT)
-  double totPOT = 0.;
-  TList* files = ch.GetListOfFiles();
-  for (int i=0; i<files->GetEntries(); ++i) {
-    TFile f(((TChainElement*)files->At(i))->GetTitle());
-    if (auto hp = (TH1*)f.Get("POT")) totPOT += hp->Integral();
+  double totPOT = 0.0;
+
+  auto* files = ch.GetListOfFiles();
+  TIter next(files);
+  while (auto* el = static_cast<TChainElement*>(next())) {
+    TFile f(el->GetTitle(), "READ");
+    if (!f.IsOpen()) continue;
+    if (auto* hp = dynamic_cast<TH1*>(f.Get("POT"))) {
+      totPOT += hp->Integral();
+    }
   }
 
   std::cout << "[" << mode << "] ∫_"
