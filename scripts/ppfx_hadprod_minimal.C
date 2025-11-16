@@ -4,7 +4,7 @@
 #include "TCanvas.h"
 #include "TPad.h"
 #include "TStyle.h"
-#include "TH1D.h"
+#include "TH1.h"
 #include "TH2D.h"
 #include "TSystem.h"
 #include "TMatrixD.h"
@@ -14,7 +14,6 @@
 #include <map>
 #include <set>
 #include <algorithm>
-#include <iterator>
 #include <cmath>
 #include <cstdio>
 
@@ -46,16 +45,43 @@ static bool same_binning(const TH1* a, const TH1* b){
   return true;
 }
 
-static TH1D* get_cv_energy(TFile& f, const std::string& flav){
-  TH1D* h = (TH1D*)f.Get((flav + "/Detsmear/" + flav + "_CV_AV_TPC_5MeV_bin").c_str());
-  if(!h) h = (TH1D*)f.Get((flav + "/Detsmear/" + flav + "_CV_AV_TPC").c_str());
-  if(!h) return nullptr;
-  TH1D* c = (TH1D*)h->Clone((std::string("cv_")+flav).c_str());
+// find any PPFX Multisim 1D histogram to serve as a binning probe
+static TH1* probe_multisim_1d(TFile& f, const std::string& flav){
+  auto* d = f.GetDirectory( (flav + "/Multisims").c_str() );
+  if(!d) return 0;
+  TIter it(d->GetListOfKeys());
+  while(auto* k=(TKey*)it()){
+    const std::string cls = k->GetClassName();
+    if(cls.rfind("TH1",0)!=0) continue;           // not TH1*
+    const std::string name = k->GetName();
+    if(name.find(flav+"_ppfx_")!=0) continue;
+    if(name.find("_2D")!=std::string::npos) continue;
+    if(TH1* h = (TH1*)d->Get(name.c_str())) return h;
+  }
+  return 0;
+}
+
+// choose CV histogram matched to Multisims binning when possible
+static TH1* get_cv_energy(TFile& f, const std::string& flav){
+  const std::string base = flav + "/Detsmear/" + flav + "_CV_";
+  TH1* h_av = (TH1*)f.Get( (base + "AV_TPC").c_str() );
+  TH1* h_5  = (TH1*)f.Get( (base + "AV_TPC_5MeV_bin").c_str() );
+
+  TH1* pick = 0;
+  if(TH1* probe = probe_multisim_1d(f,flav)){
+    if(h_av && same_binning(h_av, probe)) pick = h_av;
+    else if(h_5 && same_binning(h_5, probe)) pick = h_5;
+  }
+  if(!pick) pick = h_av ? h_av : h_5;
+  if(!pick) return 0;
+
+  TH1* c = (TH1*)pick->Clone((std::string("cv_")+flav).c_str());
   c->SetDirectory(0);
   return c;
 }
 
-struct PPFXCat { std::map<int,TH1D*> univ; };
+// store universes per category (accept any TH1*)
+struct PPFXCat { std::map<int,TH1*> univ; };
 
 static std::map<std::string,PPFXCat> scan_ppfx_categories(TFile& f, const std::string& flav){
   std::map<std::string,PPFXCat> out;
@@ -63,21 +89,23 @@ static std::map<std::string,PPFXCat> scan_ppfx_categories(TFile& f, const std::s
   if(!d) return out;
   TIter it(d->GetListOfKeys());
   while(auto* k=(TKey*)it()){
-    if(std::string(k->GetClassName())!="TH1D") continue;
-    std::string name = k->GetName();
-    if(name.find("_2D")!=std::string::npos) continue;
+    const std::string cls = k->GetClassName();
+    if(cls.rfind("TH1",0)!=0) continue; // accept TH1D, TH1F, ...
+    const std::string name = k->GetName();
     if(name.find(flav+"_ppfx_")!=0) continue;
+    if(name.find("_2D")!=std::string::npos) continue;
+
     size_t posUni = name.find("_Uni_");
     if(posUni==std::string::npos) continue;
-    std::string cat = name.substr( (flav+"_ppfx_").size(), posUni-(flav+"_ppfx_").size() );
     size_t posIdx = posUni + 5;
     size_t posEnd = name.find("_", posIdx);
     int idx = std::stoi(name.substr(posIdx, posEnd-posIdx));
-    auto* h=(TH1D*)d->Get(name.c_str());
-    if(!h) continue;
-    auto* c=(TH1D*)h->Clone((std::string("cl_")+name).c_str());
-    c->SetDirectory(0);
-    out[cat].univ[idx] = c;
+
+    if(TH1* h=(TH1*)d->Get(name.c_str())){
+      TH1* c=(TH1*)h->Clone((std::string("cl_")+name).c_str());
+      c->SetDirectory(0);
+      out[name.substr((flav+"_ppfx_").size(), posUni-(flav+"_ppfx_").size())].univ[idx] = c;
+    }
   }
   return out;
 }
@@ -89,64 +117,68 @@ struct JointPack {
 };
 
 static bool build_joint_covariance(TFile& f, const char* mode, JointPack& JP){
-  std::vector<TH1D*> cvs; cvs.reserve(CFG::FLAVS.size());
+  // 1) get CVs (auto-match binning)
+  std::vector<TH1*> cvs; cvs.reserve(CFG::FLAVS.size());
   for(const auto& flav : CFG::FLAVS){
-    TH1D* cv = get_cv_energy(f,flav);
-    if(!cv){ printf("[%s] Missing CV for %s\n",mode,flav.c_str()); for(auto* h:cvs) delete h; return false; }
+    TH1* cv = get_cv_energy(f,flav);
+    if(!cv){ printf("[%s] Missing CV for %s\n",mode,flav.c_str());
+      for(auto* h:cvs) delete h; return false; }
     cvs.push_back(cv);
   }
   for(size_t i=1;i<cvs.size();++i){
     if(!same_binning(cvs[0],cvs[i])){
       printf("[%s] CV binnings differ across flavors\n",mode);
-      for(auto* h:cvs) delete h;
-      return false;
-    }
+      for(auto* h:cvs) delete h; return false; }
   }
+
   const int nb = cvs[0]->GetNbinsX();
   const int NF = (int)CFG::FLAVS.size();
   const int Ntot = nb*NF;
 
+  // 2) gather universes
   std::map<std::string, std::map<std::string,PPFXCat>> cats_by_flav;
   std::set<std::string> all_categories;
   for(const auto& flav : CFG::FLAVS){
     cats_by_flav[flav] = scan_ppfx_categories(f,flav);
     if(cats_by_flav[flav].empty()){
       printf("[%s] No PPFX universes for %s\n",mode,flav.c_str());
-      for(auto* h:cvs) delete h;
-      return false;
-    }
+      for(auto* h:cvs) delete h; return false; }
     for(const auto& kv : cats_by_flav[flav]) all_categories.insert(kv.first);
   }
 
+  // 3) build CV vector
   TVectorD vCV(Ntot); vCV.Zero();
   for(int fli=0; fli<NF; ++fli)
     for(int b=1;b<=nb;++b)
       vCV[fli*nb + (b-1)] = cvs[fli]->GetBinContent(b);
 
+  // 4) covariance = sum over categories of sample covariances
   TMatrixD C(Ntot,Ntot); C.Zero();
   int cats_considered=0, cats_used=0, total_univ_used=0;
 
   for(const auto& cat : all_categories){
     ++cats_considered;
 
+    // build union of universe indices across flavors
     std::set<int> idx_union;
     for(const auto& flav : CFG::FLAVS){
       auto itf = cats_by_flav[flav].find(cat);
       if(itf==cats_by_flav[flav].end()) continue;
       for(const auto& ij : itf->second.univ) idx_union.insert(ij.first);
     }
-    if(idx_union.size()<2) continue;
+    if((int)idx_union.size()<2) continue;
 
     TMatrixD Cc(Ntot,Ntot); Cc.Zero();
     int Nu = 0;
+
     for(int ui : idx_union){
-      ++Nu;
       TVectorD v(Ntot); v.Zero();
-      bool ok=true, has_variation=false;
+      bool ok=true, varied=false;
+
       for(int fli=0; fli<NF && ok; ++fli){
-        const auto& flav = CFG::FLAVS[fli];
+        const std::string& flav = CFG::FLAVS[fli];
+        TH1* src = 0;
         auto itf = cats_by_flav[flav].find(cat);
-        TH1D* src = nullptr;
         if(itf!=cats_by_flav[flav].end()){
           auto itu = itf->second.univ.find(ui);
           if(itu!=itf->second.univ.end()) src = itu->second;
@@ -154,20 +186,23 @@ static bool build_joint_covariance(TFile& f, const char* mode, JointPack& JP){
         if(src){
           if(!same_binning(cvs[fli],src)){ ok=false; break; }
           for(int b=1;b<=nb;++b) v[fli*nb + (b-1)] = src->GetBinContent(b);
-          has_variation = true;
+          // detect any variation vs CV
+          for(int b=1;b<=nb;++b) if(src->GetBinContent(b)!=cvs[fli]->GetBinContent(b)){ varied=true; break; }
         } else {
           for(int b=1;b<=nb;++b) v[fli*nb + (b-1)] = cvs[fli]->GetBinContent(b);
         }
       }
-      if(!ok || !has_variation) { Nu--; continue; }
+
+      if(!ok || !varied) continue;
+      ++Nu;
+
       for(int i=0;i<Ntot;++i){
         const double di = v[i]-vCV[i];
-        for(int j=0;j<Ntot;++j){
-          const double dj = v[j]-vCV[j];
-          Cc(i,j) += di*dj;
-        }
+        for(int j=0;j<Ntot;++j)
+          Cc(i,j) += di*(v[j]-vCV[j]);
       }
     }
+
     if(Nu>1){
       Cc *= (1.0/(Nu-1));
       C += Cc;
@@ -176,8 +211,10 @@ static bool build_joint_covariance(TFile& f, const char* mode, JointPack& JP){
     }
   }
 
-  printf("[%s] categories: considered=%d, used=%d, universes=%d\n", mode, cats_considered, cats_used, total_univ_used);
+  printf("[%s] categories: considered=%d, used=%d, universes=%d\n",
+         mode, cats_considered, cats_used, total_univ_used);
 
+  // 5) output pack
   JP.nb = nb;
   JP.cv_stacked.ResizeTo(Ntot);
   JP.C_joint.ResizeTo(Ntot,Ntot);
@@ -186,11 +223,18 @@ static bool build_joint_covariance(TFile& f, const char* mode, JointPack& JP){
       JP.cv_stacked[fli*nb + (b-1)] = cvs[fli]->GetBinContent(b);
   JP.C_joint = C;
 
+  // cleanup cloned CVs and Multisim clones
   for(auto* h : cvs) delete h;
+  for(const auto& flav : CFG::FLAVS){
+    for(const auto& kv : cats_by_flav[flav]){
+      for(const auto& uv : kv.second.univ) delete uv.second;
+    }
+  }
+
   return (cats_used>0);
 }
 
-static TH2D* make_corr_hist(const TMatrixD& C, int nb, const char* name, const char* title){
+static TH2D* make_corr_hist(const TMatrixD& C, const char* name, const char* title){
   const int N = C.GetNrows();
   TH2D* H = new TH2D(name, title, N, 0.5, N+0.5, N, 0.5, N+0.5);
   for(int i=0;i<N;++i){
@@ -218,12 +262,14 @@ void ppfx_hadprod_minimal(){
   JointPack JF, JR;
   if(!build_joint_covariance(fFHC, "FHC", JF)) { printf("[FHC] Joint build failed.\n"); return; }
   if(!build_joint_covariance(fRHC, "RHC", JR)) { printf("[RHC] Joint build failed.\n"); return; }
-  TH2D* HF = make_corr_hist(JF.C_joint, JF.nb, "Hcorr_FHC", "PPFX cross-flavor correlation (FHC);stack index i;stack index j");
-  TH2D* HR = make_corr_hist(JR.C_joint, JR.nb, "Hcorr_RHC", "PPFX cross-flavor correlation (RHC);stack index i;stack index j");
+  TH2D* HF = make_corr_hist(JF.C_joint, "Hcorr_FHC", "PPFX cross-flavor correlation (FHC);stack index i;stack index j");
+  TH2D* HR = make_corr_hist(JR.C_joint, "Hcorr_RHC", "PPFX cross-flavor correlation (RHC);stack index i;stack index j");
   TCanvas c("c_corr_dual","PPFX cross-flavor correlation — FHC vs RHC",1400,700);
   c.Divide(2,1);
   c.cd(1); gPad->SetRightMargin(0.13); HF->Draw("COLZ");
   c.cd(2); gPad->SetRightMargin(0.13); HR->Draw("COLZ");
   c.Update();
   c.Print("ppfx_crossFlavor_corr_FHC_RHC.png");
+
+  delete HF; delete HR;
 }
