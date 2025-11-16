@@ -41,7 +41,7 @@ void make_lambda_visibility_plot() {
   const double p_star   = std::sqrt(std::max(0.0, Ep_star*Ep_star - phys::mp*phys::mp));
   const double Ep_min   = std::sqrt(phys::mp*phys::mp  + cfg::pmin_p*cfg::pmin_p);
   const double Epi_min  = std::sqrt(phys::mpi*phys::mpi + cfg::pmin_pi*cfg::pmin_pi);
-  const double pvis     = 0.38; // Λ visibility threshold [GeV/c]
+  const double pvis     = 0.45; // Λ visibility threshold [GeV/c]
 
   // --------- Analytic visibility fraction F_kin(p_Λ) ----------
   const int N = 600;
