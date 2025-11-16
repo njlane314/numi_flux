@@ -32,13 +32,6 @@ namespace cfg {
   constexpr double xlow  = 0.0, xhigh = 3.0; // p_Λ range [GeV/c]
 }
 
-double p_vis_min(double pmin_p, double pmin_pi) {
-  const double Ep_min  = std::sqrt(phys::mp*phys::mp  + pmin_p*pmin_p);
-  const double Epi_min = std::sqrt(phys::mpi*phys::mpi + pmin_pi*pmin_pi);
-  const double gamma   = (Ep_min + Epi_min)/phys::mL;
-  return phys::mL * std::sqrt(std::max(0.0, gamma*gamma - 1.0));
-}
-
 void make_lambda_visibility_plot() {
   gStyle->SetOptStat(0);
 
@@ -48,7 +41,7 @@ void make_lambda_visibility_plot() {
   const double p_star   = std::sqrt(std::max(0.0, Ep_star*Ep_star - phys::mp*phys::mp));
   const double Ep_min   = std::sqrt(phys::mp*phys::mp  + cfg::pmin_p*cfg::pmin_p);
   const double Epi_min  = std::sqrt(phys::mpi*phys::mpi + cfg::pmin_pi*cfg::pmin_pi);
-  const double pvis     = p_vis_min(cfg::pmin_p, cfg::pmin_pi);
+  const double pvis     = 0.38; // Λ visibility threshold [GeV/c]
 
   // --------- Analytic visibility fraction F_kin(p_Λ) ----------
   const int N = 600;
@@ -84,7 +77,7 @@ void make_lambda_visibility_plot() {
       T->SetBranchAddress(cfg::br_isSig, &isSig);
       T->SetBranchAddress(cfg::br_isSel, &isSel);
 
-      eff = new TEfficiency("eff",";p_{#Lambda} at nuclear exit [GeV/c];#varepsilon_{fid} (MC)",
+      eff = new TEfficiency("eff",";p_{#Lambda} at Nuclear Exit [GeV/c];#varepsilon_{fid} (MC)",
                             cfg::nbins, cfg::xlow, cfg::xhigh);
       eff->SetStatisticOption(TEfficiency::kFCP);
 
@@ -100,7 +93,7 @@ void make_lambda_visibility_plot() {
   // --------- Draw ----------
   TCanvas c("c","Λ visibility & MC efficiency", 900, 650);
   auto* frame = c.DrawFrame(cfg::xlow, 0.0, cfg::xhigh, 1.05,
-                            ";p_{#Lambda} at nuclear exit [GeV/c];fraction / efficiency");
+                            ";p_{#Lambda} at Nuclear Exit [GeV/c];Kinematic Visibility Efficiency");
   frame->GetYaxis()->SetTitleOffset(1.15);
 
   gF->Draw("L");
