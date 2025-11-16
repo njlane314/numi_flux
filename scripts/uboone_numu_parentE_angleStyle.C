@@ -112,7 +112,7 @@ static TLegend* build_legend_like_stacked(TPad* p_leg,
   double s_tot=0.0; for(double s:sums) s_tot+=s;
   for(size_t i=0;i<items.size();++i){
     TString lab=items[i].second;
-    if(show_pct && s_tot>0 && i<sums.size()) lab = Form("%s (%.1f%%)", lab.Data(), 100.0*sums[i]/s_tot);
+    if(show_pct && s_tot>0 && i<sums.size()) lab = Form("%s (%.2f%%)", lab.Data(), 100.0*sums[i]/s_tot);
     L->AddEntry(items[i].first, lab, "l");
   }
   return L;
@@ -180,7 +180,7 @@ static void draw_numu_parent_energy(const char* mode, TFile& f){
   int C_muP = TColor::GetColor("#7c4dff"); // vivid violet
   int C_muM = TColor::GetColor("#aa00ff"); // vivid magenta
   int C_KL  = TColor::GetColor("#00e5ff"); // bright cyan
-  int C_tot = TColor::GetColor("#111111"); // near-black for total
+  int C_tot = TColor::GetColor("#616161"); // dark gray for total (not black)
 
   style_line(h_piP, C_piP, 1);
   style_line(h_piM, C_piM, 1);
