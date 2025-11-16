@@ -50,7 +50,7 @@ static TLegend* build_flux_legend_like_stacked(TPad* p_leg, TH1* h_numu, TH1* h_
   return L;
 }
 
-static void style_line(TH1* h,int col,int ls){ h->SetLineColor(col); h->SetLineStyle(ls); h->SetLineWidth(3); h->SetMarkerSize(0); }
+static void style_line(TH1* h,int col,int ls){ h->SetLineColor(col); h->SetLineStyle(ls); h->SetLineWidth(1.2); h->SetMarkerSize(0); }
 
 static double integral_in(double xmin, double xmax, const TH1* h, bool width=false){
   int bmin = std::max(1, h->GetXaxis()->FindFixBin(xmin + 1e-9));
