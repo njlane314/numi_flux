@@ -201,8 +201,8 @@ static void draw_one_plot(const char* mode,
 }
 
 // ------------------------------ Driver --------------------------------------
-void flux_fig_B_EvTheta_individual(const char* fhc_file = CFG::FILE_FHC,
-                                   const char* rhc_file = CFG::FILE_RHC)
+void flux_fig_B_EvTheta_individual(const char* fhc_file,
+                                   const char* rhc_file)
 {
   set_minimal_white_style();
 
