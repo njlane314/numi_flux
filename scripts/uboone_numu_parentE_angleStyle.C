@@ -3,7 +3,8 @@
 //
 // Draw \u03bd\u03bc energy spectra broken down by parent (\u03c0+, \u03c0-, K+, K-, \u03bc+, \u03bc-, K0L)
 // using the same visual style as your angle spectra (split canvas + stacked
-// legend, log-y, 1.2 line width, etc.). Percentages shown integrate E\u03bd>60 MeV.
+// legend, log-y, 1.2 line width, etc.).
+// NOTE: All histograms are converted to a flux *density* (divide by bin width).
 // ============================================================================
 
 #include "TFile.h"
@@ -117,12 +118,24 @@ static TLegend* build_legend_like_stacked(TPad* p_leg,
   return L;
 }
 
-// Helper: fetch the best-available \u03bd\u03bc CV energy spectrum
+// Helper: convert a histogram to density (divide by \u0394E of each bin).
+static void make_density(TH1* h){
+  if(!h) return;
+  // ROOT will divide each bin by its width and properly scale errors.
+  h->Scale(1.0, "width");
+}
+
+// Helper: fetch the best-available \u03bd\u03bc CV energy spectrum (prefer uniform binning)
 static TH1D* cv_energy_numu(TFile& f){
-  TH1D* h = (TH1D*)f.Get("numu/Detsmear/numu_CV_AV_TPC");
-  if(!h)   h = (TH1D*)f.Get("numu/Detsmear/numu_CV_AV_TPC_5MeV_bin");
+  // Prefer uniformly binned version if available, fall back to legacy (often variable-width)
+  TH1D* h = (TH1D*)f.Get("numu/Detsmear/numu_CV_AV_TPC_5MeV_bin");
+  if(!h)   h = (TH1D*)f.Get("numu/Detsmear/numu_CV_AV_TPC");
   if(!h)   return nullptr;
   h=(TH1D*)h->Clone("cv_numu"); h->SetDirectory(0);
+  // Do NOT rebin here: parents may have different native binning; we will convert
+  // everything to a density so comparisons are meaningful regardless of \u0394E.
+  // If you later want to make the total less "steppy", rebin after cloning and
+  // before make_density().
   return h;
 }
 
@@ -153,6 +166,12 @@ static void draw_numu_parent_energy(const char* mode, TFile& f){
     delete Htot; return;
   }
 
+  // --- Normalize all histograms to *density* (per GeV) so variable-width bins
+  //     (e.g. CV total) are comparable to fine-binned parent spectra.
+  for(TH1* h : std::vector<TH1*>{Htot,h_piP,h_piM,h_kP,h_kM,h_muP,h_muM,h_KL}){
+    make_density(h);
+  }
+
   // Styling (same palette as your angle plots; +/- get different line styles)
   int CR=TColor::GetColor("#e41a1c"); // red
   int CB=TColor::GetColor("#1f78b4"); // blue
@@ -180,9 +199,8 @@ static void draw_numu_parent_energy(const char* mode, TFile& f){
   p_main->cd();
   double xmin=Htot->GetXaxis()->GetXmin(), xmax=Htot->GetXaxis()->GetXmax();
   TH1D* frame=new TH1D(Form("frame_numu_parentE_%s",mode),"",100,xmin,xmax);
-  int binwMeV=(int)std::lround(Htot->GetXaxis()->GetBinWidth(1)*1000.0);
   frame->GetXaxis()->SetTitle("E_{#nu} [GeV]");
-  frame->GetYaxis()->SetTitle(Form("Flux / 6 #times 10^{20} POT / %d MeV / cm^{2}",binwMeV));
+  frame->GetYaxis()->SetTitle("Flux / 6 #times 10^{20} POT / GeV / cm^{2}");
   auto_logy_limits_range(frame,{Htot,h_piP,h_piM,h_kP,h_kM,h_muP,h_muM,h_KL},xmin,xmax);
   frame->Draw("AXIS");
 
