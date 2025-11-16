@@ -6,6 +6,7 @@
 #include "TStyle.h"
 #include "TH1D.h"
 #include "TH2D.h"
+#include "TSystem.h"
 #include "TMatrixD.h"
 #include "TVectorD.h"
 #include <vector>
@@ -20,7 +21,19 @@
 namespace CFG {
   const char* FILE_FHC_DEF = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_FHC.root";
   const char* FILE_RHC_DEF = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_RHC.root";
+  const char* ENV_FHC = "PPFX_FHC_FILE";
+  const char* ENV_RHC = "PPFX_RHC_FILE";
   static const std::vector<std::string> FLAVS = {"numu","numubar","nue","nuebar"};
+}
+
+static std::string pick_file_path(const char* env_name, const char* def_path, const char* label){
+  const char* env_val = gSystem ? gSystem->Getenv(env_name) : nullptr;
+  if(env_val && env_val[0]){
+    printf("Using %s file override from %s: %s\n", label, env_name, env_val);
+    return env_val;
+  }
+  printf("Using default %s file: %s\n", label, def_path);
+  return def_path;
 }
 
 static bool same_binning(const TH1* a, const TH1* b){
@@ -196,10 +209,12 @@ static TH2D* make_corr_hist(const TMatrixD& C, int nb, const char* name, const c
 
 void ppfx_hadprod_minimal(){
   gStyle->SetOptStat(0);
-  TFile fFHC(CFG::FILE_FHC_DEF,"READ");
-  TFile fRHC(CFG::FILE_RHC_DEF,"READ");
-  if(fFHC.IsZombie()){ printf("Cannot open FHC file: %s\n",CFG::FILE_FHC_DEF); return; }
-  if(fRHC.IsZombie()){ printf("Cannot open RHC file: %s\n",CFG::FILE_RHC_DEF); return; }
+  const std::string fhc_path = pick_file_path(CFG::ENV_FHC, CFG::FILE_FHC_DEF, "FHC");
+  const std::string rhc_path = pick_file_path(CFG::ENV_RHC, CFG::FILE_RHC_DEF, "RHC");
+  TFile fFHC(fhc_path.c_str(),"READ");
+  TFile fRHC(rhc_path.c_str(),"READ");
+  if(fFHC.IsZombie()){ printf("Cannot open FHC file: %s\n",fhc_path.c_str()); return; }
+  if(fRHC.IsZombie()){ printf("Cannot open RHC file: %s\n",rhc_path.c_str()); return; }
   JointPack JF, JR;
   if(!build_joint_covariance(fFHC, "FHC", JF)) { printf("[FHC] Joint build failed.\n"); return; }
   if(!build_joint_covariance(fRHC, "RHC", JR)) { printf("[RHC] Joint build failed.\n"); return; }
