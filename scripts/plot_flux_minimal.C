@@ -91,7 +91,7 @@ static void draw_one(const char* file,const char* tag,const char* out){
   p_main->Draw(); p_leg->Draw();
   p_main->cd();
 
-  TH1D* frame=(TH1D*)a->Clone(Form("frame_%s",tag)); frame->Reset("ICES");
+  TH1D* frame=new TH1D(Form("frame_%s",tag),"",100,Emin,Emax);
   int binwMeV=(int)std::lround(a->GetXaxis()->GetBinWidth(1)*1000.0);
   frame->GetXaxis()->SetTitle("Neutrino Energy [GeV]");
   frame->GetYaxis()->SetTitle(Form("#nu / 6 #times 10^{20} POT / %d MeV / cm^{2}",binwMeV));
@@ -107,7 +107,7 @@ static void draw_one(const char* file,const char* tag,const char* out){
   L->Draw();
 
   canv.cd(); canv.Update(); canv.Print(out);
-  printf("[plot_flux_minimal] %s | bin width ≈ %.3f GeV (%d MeV) | y-axis: %s\n", tag, a->GetXaxis()->GetBinWidth(1), binwMeV, frame->GetYaxis()->GetTitle());
+  printf("[plot_flux_minimal] %s | bin width ≈ %.3f GeV (%d MeV)\n", tag, a->GetXaxis()->GetBinWidth(1), binwMeV);
   delete frame; delete L; delete p_main; delete p_leg; delete a; delete b; delete c; delete d;
 }
 
