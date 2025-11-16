@@ -42,6 +42,7 @@
 #include "TH2.h"
 #include "TH2D.h"
 #include "TLatex.h"
+#include "TPaletteAxis.h"
 
 #include <vector>
 #include <string>
@@ -66,6 +67,15 @@ namespace CFG {
   // Drawing
   constexpr bool LOGZ = true;
   constexpr int  NCONT = 255;
+
+  // Layout (NEW): give more room for the palette on the right
+  constexpr double PAD_LEFT   = 0.15;
+  constexpr double PAD_RIGHT  = 0.22;
+  constexpr double PAD_TOP    = 0.07;
+  constexpr double PAD_BOTTOM = 0.12;
+
+  // Watermark text (NEW). Replace with your exact mark if different.
+  const char* WATERMARK_TEXT = "#nu";
 }
 
 // Minimal, legible global style (matches your font/spacing choices)
@@ -81,8 +91,20 @@ static void set_global_style(){
   s->SetOptStat(0); s->SetOptTitle(0);
   s->SetPadTickX(1); s->SetPadTickY(1);
   TGaxis::SetMaxDigits(4);
-  s->SetPadLeftMargin(0.15); s->SetPadRightMargin(0.14);
-  s->SetPadTopMargin(0.07);  s->SetPadBottomMargin(0.12);
+  s->SetPadLeftMargin(CFG::PAD_LEFT);
+  s->SetPadRightMargin(CFG::PAD_RIGHT);
+  s->SetPadTopMargin(CFG::PAD_TOP);
+  s->SetPadBottomMargin(CFG::PAD_BOTTOM);
+
+  s->SetCanvasColor(kWhite);
+  s->SetPadColor(kWhite);
+  s->SetFrameFillColor(kWhite);
+  s->SetFrameFillStyle(0);
+  s->SetStatColor(kWhite);
+  s->SetCanvasBorderMode(0);
+  s->SetPadBorderMode(0);
+  s->SetFrameBorderMode(0);
+  s->SetTitleOffset(1.25,"Z");
   gROOT->SetStyle("FluxFigStyle"); gROOT->ForceStyle();
 }
 
@@ -186,7 +208,20 @@ static TH2D* fetch_clone(TFile& f, const std::string& flav){
   c->GetXaxis()->SetTitle("E_{#nu} [GeV]");
   c->GetYaxis()->SetTitle("#theta_{#nu} [rad]");
   c->GetZaxis()->SetTitle("Flux / 6 #times 10^{20} POT / (GeV#timesrad) / cm^{2}");
+  c->GetZaxis()->CenterTitle(true);
   return c;
+}
+
+static void draw_watermark_top_right(const char* text){
+  if(!gPad) return;
+  TLatex w;
+  w.SetTextFont(42);
+  w.SetTextSize(0.040);
+  w.SetTextAlign(33);
+  w.SetTextColor(kGray+2);
+  const double x = 1.0 - gPad->GetRightMargin() - 0.01;
+  const double y = 1.0 - gPad->GetTopMargin()   - 0.01;
+  w.DrawLatexNDC(x, y, text);
 }
 
 // One-pad, per-flavor canvas (shared X/Y/Z ranges)
@@ -200,10 +235,14 @@ static void draw_single_canvas(const HRef& hr,
                  hr.mode.c_str(), hr.flav.c_str()),
             900, 750);
   c.cd();
-  gPad->SetLeftMargin(0.15);
-  gPad->SetRightMargin(0.14);
-  gPad->SetTopMargin(0.07);
-  gPad->SetBottomMargin(0.12);
+  c.SetFillColor(kWhite);
+  c.SetBorderMode(0);
+  gPad->SetFillColor(kWhite);
+  gPad->SetLeftMargin(CFG::PAD_LEFT);
+  gPad->SetRightMargin(CFG::PAD_RIGHT);
+  gPad->SetTopMargin(CFG::PAD_TOP);
+  gPad->SetBottomMargin(CFG::PAD_BOTTOM);
+  gPad->SetBorderMode(0);
   if (CFG::LOGZ) gPad->SetLogz();
 
   if (!hr.hist) {
@@ -221,8 +260,25 @@ static void draw_single_canvas(const HRef& hr,
   H->SetMaximum(zmax);
   H->Draw("COLZ");
 
+  gPad->Update();
+  if (TPaletteAxis* pal =
+        dynamic_cast<TPaletteAxis*>(H->GetListOfFunctions()->FindObject("palette"))) {
+    const double x1 = 1.0 - gPad->GetRightMargin() + 0.02;
+    const double x2 = x1 + 0.06;
+    const double y1 = gPad->GetBottomMargin();
+    const double y2 = 1.0 - gPad->GetTopMargin();
+    pal->SetX1NDC(x1);
+    pal->SetX2NDC(x2);
+    pal->SetY1NDC(y1);
+    pal->SetY2NDC(y2);
+    pal->SetLabelSize(0.035);
+    pal->SetTitleSize(0.042);
+    pal->SetTitleOffset(1.10);
+  }
+
   TLatex lab; lab.SetTextFont(42); lab.SetTextSize(0.052); lab.SetTextAlign(13);
   lab.DrawLatexNDC(0.16, 0.92, label_for(hr.flav).c_str());
+  draw_watermark_top_right(CFG::WATERMARK_TEXT);
   c.Update();
   c.Print(Form("uboone_figB_EvTheta_%s_%s.pdf",
                hr.mode.c_str(), hr.flav.c_str()));
