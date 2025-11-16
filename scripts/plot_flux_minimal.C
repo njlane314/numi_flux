@@ -52,10 +52,43 @@ static TLegend* build_flux_legend_like_stacked(TPad* p_leg, TH1* h_numu, TH1* h_
 
 static void style_line(TH1* h,int col,int ls){ h->SetLineColor(col); h->SetLineStyle(ls); h->SetLineWidth(3); h->SetMarkerSize(0); }
 
-static double integral_in(double xmin,double xmax,const TH1* h){
-  int bmin=std::max(1,h->GetXaxis()->FindFixBin(xmin+1e-9));
-  int bmax=std::min(h->GetNbinsX(),h->GetXaxis()->FindFixBin(xmax-1e-9));
-  return h->Integral(bmin,bmax);
+static double integral_in(double xmin, double xmax, const TH1* h, bool width=false){
+  int bmin = std::max(1, h->GetXaxis()->FindFixBin(xmin + 1e-9));
+  int bmax = std::min(h->GetNbinsX(), h->GetXaxis()->FindFixBin(xmax - 1e-9));
+  return width ? h->Integral(bmin, bmax, "width") : h->Integral(bmin, bmax);
+}
+
+static double integral_and_error(double xmin, double xmax, const TH1* h,
+                                 double& err, bool width=true){
+  int bmin = std::max(1, h->GetXaxis()->FindFixBin(xmin + 1e-9));
+  int bmax = std::min(h->GetNbinsX(), h->GetXaxis()->FindFixBin(xmax - 1e-9));
+  err = 0.0;
+  return h->IntegralAndError(bmin, bmax, err, width ? "width" : "");
+}
+
+static void print_flux_window_integrals(const char* tag,
+                                        const TH1* h_numu,  const TH1* h_anumu,
+                                        const TH1* h_nue,   const TH1* h_anue,
+                                        double xmin, double xmax){
+  double e_numu, e_anumu, e_nue, e_anue;
+  const double i_numu  = integral_and_error(xmin, xmax, h_numu , e_numu , /*width=*/true);
+  const double i_anumu = integral_and_error(xmin, xmax, h_anumu, e_anumu, /*width=*/true);
+  const double i_nue   = integral_and_error(xmin, xmax, h_nue  , e_nue  , /*width=*/true);
+  const double i_anue  = integral_and_error(xmin, xmax, h_anue , e_anue , /*width=*/true);
+  const double i_tot   = i_numu + i_anumu + i_nue + i_anue;
+
+  auto pct = [&](double x){ return (i_tot > 0 ? 100.0*x/i_tot : 0.0); };
+  const int binwMeV = (int)std::lround(h_numu->GetXaxis()->GetBinWidth(1) * 1000.0);
+
+  printf("[plot_flux_minimal/%s] Energy-window integrals (%.2f–%.2f GeV)\n", tag, xmin, xmax);
+  printf("  (TH1::Integral(...,\"width\") used: area = sum(content × binWidth).\n");
+  printf("   Units ≈ # / 6×10^20 POT / cm^2; histogram y-axis is per %d MeV.)\n", binwMeV);
+
+  printf("    nu_mu      : % .6e  ± %.2e   (%.1f%%)\n", i_numu , e_numu , pct(i_numu ));
+  printf("    anti-nu_mu : % .6e  ± %.2e   (%.1f%%)\n", i_anumu, e_anumu, pct(i_anumu));
+  printf("    nu_e       : % .6e  ± %.2e   (%.1f%%)\n", i_nue  , e_nue  , pct(i_nue  ));
+  printf("    anti-nu_e  : % .6e  ± %.2e   (%.1f%%)\n", i_anue , e_anue , pct(i_anue ));
+  printf("    TOTAL      : % .6e\n\n", i_tot);
 }
 
 static void auto_logy_limits_range(TH1* frame, std::initializer_list<TH1*> hs, double xmin, double xmax){
@@ -79,6 +112,9 @@ static void draw_one(const char* file,const char* tag,const char* out){
   if(!a||!b||!c||!d){ printf("[plot_flux_minimal/%s] missing *_CV_AV_TPC in Detsmear\n",tag); return; }
   a=(TH1D*)a->Clone("h_numu"); b=(TH1D*)b->Clone("h_anumu"); c=(TH1D*)c->Clone("h_nue"); d=(TH1D*)d->Clone("h_anue");
   a->SetDirectory(0); b->SetDirectory(0); c->SetDirectory(0); d->SetDirectory(0); f.Close();
+
+  const double PrintMin = 0.25;
+  print_flux_window_integrals(tag, a, b, c, d, PrintMin, Emax);
 
   int CR=TColor::GetColor("#e41a1c"), CB=TColor::GetColor("#1f78b4");
   style_line(a,CR,1); style_line(c,CR,2); style_line(b,CB,1); style_line(d,CB,3);
