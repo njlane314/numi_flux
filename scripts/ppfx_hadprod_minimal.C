@@ -94,6 +94,7 @@ static bool build_joint_covariance(TFile& f, const char* mode, JointPack& JP){
   const int Ntot = nb*NF;
 
   std::map<std::string, std::map<std::string,PPFXCat>> cats_by_flav;
+  std::set<std::string> all_categories;
   for(const auto& flav : CFG::FLAVS){
     cats_by_flav[flav] = scan_ppfx_categories(f,flav);
     if(cats_by_flav[flav].empty()){
@@ -101,6 +102,7 @@ static bool build_joint_covariance(TFile& f, const char* mode, JointPack& JP){
       for(auto* h:cvs) delete h;
       return false;
     }
+    for(const auto& kv : cats_by_flav[flav]) all_categories.insert(kv.first);
   }
 
   TVectorD vCV(Ntot); vCV.Zero();
@@ -111,42 +113,40 @@ static bool build_joint_covariance(TFile& f, const char* mode, JointPack& JP){
   TMatrixD C(Ntot,Ntot); C.Zero();
   int cats_considered=0, cats_used=0, total_univ_used=0;
 
-  for(const auto& kv : cats_by_flav[CFG::FLAVS[0]]){
-    const std::string& cat = kv.first;
+  for(const auto& cat : all_categories){
     ++cats_considered;
-    bool all_have=true;
-    for(const auto& flav : CFG::FLAVS)
-      if(!cats_by_flav[flav].count(cat)) { all_have=false; break; }
-    if(!all_have) continue;
 
-    std::set<int> idx;
-    bool first=true;
+    std::set<int> idx_union;
     for(const auto& flav : CFG::FLAVS){
-      std::set<int> s;
-      for(const auto& ij : cats_by_flav[flav].at(cat).univ) s.insert(ij.first);
-      if(first){ idx = s; first=false; }
-      else {
-        std::set<int> inter;
-        std::set_intersection(idx.begin(),idx.end(), s.begin(),s.end(),
-                              std::inserter(inter,inter.begin()));
-        idx.swap(inter);
-      }
+      auto itf = cats_by_flav[flav].find(cat);
+      if(itf==cats_by_flav[flav].end()) continue;
+      for(const auto& ij : itf->second.univ) idx_union.insert(ij.first);
     }
-    if((int)idx.size() < 2) continue;
+    if(idx_union.size()<2) continue;
 
     TMatrixD Cc(Ntot,Ntot); Cc.Zero();
     int Nu = 0;
-    for(int ui : idx){
+    for(int ui : idx_union){
       ++Nu;
       TVectorD v(Ntot); v.Zero();
-      bool ok=true;
+      bool ok=true, has_variation=false;
       for(int fli=0; fli<NF && ok; ++fli){
         const auto& flav = CFG::FLAVS[fli];
-        TH1D* u = cats_by_flav[flav].at(cat).univ.at(ui);
-        if(!same_binning(cvs[fli],u)){ ok=false; break; }
-        for(int b=1;b<=nb;++b) v[fli*nb + (b-1)] = u->GetBinContent(b);
+        auto itf = cats_by_flav[flav].find(cat);
+        TH1D* src = nullptr;
+        if(itf!=cats_by_flav[flav].end()){
+          auto itu = itf->second.univ.find(ui);
+          if(itu!=itf->second.univ.end()) src = itu->second;
+        }
+        if(src){
+          if(!same_binning(cvs[fli],src)){ ok=false; break; }
+          for(int b=1;b<=nb;++b) v[fli*nb + (b-1)] = src->GetBinContent(b);
+          has_variation = true;
+        } else {
+          for(int b=1;b<=nb;++b) v[fli*nb + (b-1)] = cvs[fli]->GetBinContent(b);
+        }
       }
-      if(!ok) { Nu--; continue; }
+      if(!ok || !has_variation) { Nu--; continue; }
       for(int i=0;i<Ntot;++i){
         const double di = v[i]-vCV[i];
         for(int j=0;j<Ntot;++j){
