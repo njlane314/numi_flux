@@ -9,10 +9,15 @@
 #include "TGaxis.h"
 #include "TString.h"
 #include "TColor.h"
+#include "TSystem.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <cstdio>
+#include <fstream>
+#include <iomanip>
+#include <vector>
+#include <string>
 
 static void set_global_style(){
   const int f=42;
@@ -102,6 +107,134 @@ static void auto_logy_limits_range(TH1* frame, std::initializer_list<TH1*> hs, d
   frame->SetMinimum(std::max(1e-30,mn*0.8)); frame->SetMaximum(mx*6.0);
 }
 
+// -------------------- NEW: CSV table writers for x-sec release --------------------
+struct FluxHists {
+  TH1D* numu    = nullptr;
+  TH1D* numubar = nullptr;
+  TH1D* nue     = nullptr;
+  TH1D* nuebar  = nullptr;
+};
+
+static bool load_flux_hists(const char* file, FluxHists& H, const char* tag){
+  TFile f(file,"READ");
+  auto fetch = [&](const char* a, const char* b)->TH1D*{
+    TH1D* h=(TH1D*)f.Get(a);
+    if(!h) h=(TH1D*)f.Get(b);
+    return h ? (TH1D*)h->Clone() : nullptr;
+  };
+  H.numu    = fetch("numu/Detsmear/numu_CV_AV_TPC_5MeV_bin",     "numu/Detsmear/numu_CV_AV_TPC");
+  H.numubar = fetch("numubar/Detsmear/numubar_CV_AV_TPC_5MeV_bin","numubar/Detsmear/numubar_CV_AV_TPC");
+  H.nue     = fetch("nue/Detsmear/nue_CV_AV_TPC_5MeV_bin",       "nue/Detsmear/nue_CV_AV_TPC");
+  H.nuebar  = fetch("nuebar/Detsmear/nuebar_CV_AV_TPC_5MeV_bin", "nuebar/Detsmear/nuebar_CV_AV_TPC");
+  if(H.numu   ) H.numu   ->SetDirectory(0);
+  if(H.numubar) H.numubar->SetDirectory(0);
+  if(H.nue    ) H.nue    ->SetDirectory(0);
+  if(H.nuebar ) H.nuebar ->SetDirectory(0);
+  f.Close();
+  if(!H.numu || !H.numubar || !H.nue || !H.nuebar){
+    printf("[tables/%s] missing *_CV_AV_TPC in Detsmear\n", tag);
+    return false;
+  }
+  return true;
+}
+
+static void write_bin_edges_csv(const TH1* ref, const char* outdir){
+  gSystem->mkdir(Form("%s/bins", outdir), true);
+  std::ofstream fo(Form("%s/bins/bin_edges.csv", outdir));
+  fo << "bin_low_GeV,bin_high_GeV\n";
+  fo << std::scientific << std::setprecision(8);
+  for(int b=1;b<=ref->GetNbinsX();++b){
+    fo << ref->GetXaxis()->GetBinLowEdge(b) << ","
+       << ref->GetXaxis()->GetBinUpEdge(b)  << "\n";
+  }
+}
+
+static void write_flux_spectrum_csv(const char* outdir, const char* mode,
+                                    const TH1* a, const TH1* b,
+                                    const TH1* c, const TH1* d){
+  gSystem->mkdir(Form("%s/flux", outdir), true);
+  TString m = TString(mode).ToLower();
+  std::ofstream fo(Form("%s/flux/numi_%s_flux.csv", outdir, m.Data()));
+  fo << "# Columns are per energy bin. Values are INTEGRATED per bin "
+        "(content × binWidth): # / (6×10^20 POT) / cm^2.\n";
+  fo << "E_low_GeV,E_high_GeV,bin_width_GeV,"
+        "numu,numu_err,numubar,numubar_err,nue,nue_err,nuebar,nuebar_err\n";
+  fo << std::scientific << std::setprecision(8);
+
+  const TH1* hs[4] = {a,b,c,d};
+  for(int bidx=1; bidx<=a->GetNbinsX(); ++bidx){
+    double lo = a->GetXaxis()->GetBinLowEdge(bidx);
+    double hi = a->GetXaxis()->GetBinUpEdge(bidx);
+    double w  = hi - lo;
+
+    double v[4], e[4];
+    for(int k=0;k<4;++k){
+      v[k] = hs[k]->GetBinContent(bidx) * w;  // integrated per bin
+      e[k] = hs[k]->GetBinError(bidx)   * w;  // stat error integrated
+    }
+    fo << lo << "," << hi << "," << w << ","
+       << v[0] << "," << e[0] << ","
+       << v[1] << "," << e[1] << ","
+       << v[2] << "," << e[2] << ","
+       << v[3] << "," << e[3] << "\n";
+  }
+}
+
+static void write_window_integrals_csv(const char* outdir, const char* mode,
+                                       const char* tag,
+                                       const TH1* a, const TH1* b,
+                                       const TH1* c, const TH1* d,
+                                       double Emin, double Emax){
+  gSystem->mkdir(Form("%s/flux", outdir), true);
+  TString m = TString(mode).ToLower();
+  std::ofstream fo(Form("%s/flux/numi_%s_integrals_%s.csv", outdir, m.Data(), tag));
+  fo << "# Integrated flux in window (" << std::fixed << std::setprecision(3)
+     << Emin << "," << Emax << ") GeV.\n";
+  fo << "# Units: # / (6×10^20 POT) / cm^2.\n";
+  fo << "mode,window,species,E_min_GeV,E_max_GeV,integral,stat_err,fraction\n";
+
+  double e[4], v[4];
+  v[0]=integral_and_error(Emin,Emax,a,e[0],true);
+  v[1]=integral_and_error(Emin,Emax,b,e[1],true);
+  v[2]=integral_and_error(Emin,Emax,c,e[2],true);
+  v[3]=integral_and_error(Emin,Emax,d,e[3],true);
+  double tot=v[0]+v[1]+v[2]+v[3];
+  const char* nm[4]={"numu","numubar","nue","nuebar"};
+
+  for(int k=0;k<4;++k){
+    fo << mode << "," << tag << "," << nm[k] << ","
+       << std::fixed << std::setprecision(3) << Emin << ","
+       << std::fixed << std::setprecision(3) << Emax << ","
+       << std::scientific << std::setprecision(8) << v[k] << ","
+       << std::scientific << std::setprecision(8) << e[k] << ","
+       << std::fixed << std::setprecision(3) << (tot>0?100.0*v[k]/tot:0.0) << "\n";
+  }
+  double etot = std::sqrt(e[0]*e[0] + e[1]*e[1] + e[2]*e[2] + e[3]*e[3]); // assumes uncorrelated species
+  fo << mode << "," << tag << ",total,"
+     << std::fixed << std::setprecision(3) << Emin << ","
+     << std::fixed << std::setprecision(3) << Emax << ","
+     << std::scientific << std::setprecision(8) << tot << ","
+     << std::scientific << std::setprecision(8) << etot << ",100.000\n";
+}
+
+static void make_tables_one(const char* file, const char* mode, const char* outdir){
+  FluxHists H{};
+  if(!load_flux_hists(file, H, mode)) return;
+
+  // write binning and spectra
+  write_bin_edges_csv(H.numu, outdir);
+  write_flux_spectrum_csv(outdir, mode, H.numu, H.numubar, H.nue, H.nuebar);
+
+  // integrated windows: full and analysis (adjust as needed)
+  const double Efull_min=0.0,  Efull_max=10.0;
+  const double Eana_min =0.25, Eana_max =10.0;
+  write_window_integrals_csv(outdir, mode, "full",     H.numu, H.numubar, H.nue, H.nuebar, Efull_min, Efull_max);
+  write_window_integrals_csv(outdir, mode, "analysis", H.numu, H.numubar, H.nue, H.nuebar, Eana_min,  Eana_max);
+
+  delete H.numu; delete H.numubar; delete H.nue; delete H.nuebar;
+}
+// ------------------ END NEW TABLE WRITERS ------------------
+
 static void draw_one(const char* file,const char* tag,const char* out){
   const double Emin=0.0, Emax=10.0, split=0.85;
   TFile f(file,"READ");
@@ -151,4 +284,10 @@ void plot_flux_minimal(){
   set_global_style();
   draw_one("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_FHC.root","FHC","uboone_flux_FHC.pdf");
   draw_one("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_RHC.root","RHC","uboone_flux_RHC.pdf");
+
+  // -------- NEW: write machine-readable flux tables for x-sec release --------
+  const char* outdir = "release"; // adjust to your repository root if needed
+  make_tables_one("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_FHC.root","FHC",outdir);
+  make_tables_one("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_RHC.root","RHC",outdir);
+  printf("[tables] Wrote CSVs under %s/{bins,flux}/\n", outdir);
 }
