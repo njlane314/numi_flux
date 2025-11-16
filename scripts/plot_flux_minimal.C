@@ -107,8 +107,8 @@ void plot_flux_minimal() {
   set_global_style();
 
   // ---------------- hardcoded choices ----------------
-  const char* FHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_fhc_ppfx_g4_10_4.root";
-  const char* RHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/comparisons/dk2nu_rhc_ppfx_g4_10_4.root";
+  const char* FHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_FHC.root";
+  const char* RHC_FILE = "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_RHC.root";
 
   const double Emin = 0.0;
   const double Emax = 10.0;
