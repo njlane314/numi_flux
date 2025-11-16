@@ -27,11 +27,9 @@
 //
 // Usage:
 //   root -l -b -q flux_fig_B_EvTheta_minimal.C
-//   root -l -b -q 'flux_fig_B_EvTheta_minimal.C("FHC.root","RHC.root")'
 //
 // Outputs:
-//   uboone_figB_EvTheta_FHC.pdf
-//   uboone_figB_EvTheta_RHC.pdf
+//   uboone_figB_EvTheta_<MODE>_<FLAVOR>.pdf   (eight files)
 // ============================================================================
 
 #include "TFile.h"
@@ -191,51 +189,53 @@ static TH2D* fetch_clone(TFile& f, const std::string& flav){
   return c;
 }
 
-static void draw_mode_canvas(const char* mode,
-                             const std::vector<HRef>& H_mode,
-                             double xlo, double xhi, double ylo, double yhi,
-                             double zmin, double zmax){
-  TCanvas c(Form("c_figB_%s",mode),
-            Form("(E_{#nu}, #theta_{#nu}) heatmaps per flavor \u2014 %s",mode),
-            1400, 1100);
-  c.Divide(2,2);
+// One-pad, per-flavor canvas (shared X/Y/Z ranges)
+static void draw_single_canvas(const HRef& hr,
+                               double xlo, double xhi,
+                               double ylo, double yhi,
+                               double zmin, double zmax)
+{
+  TCanvas c(Form("c_single_%s_%s", hr.mode.c_str(), hr.flav.c_str()),
+            Form("(E_{#nu}, #theta_{#nu}) — %s, %s",
+                 hr.mode.c_str(), hr.flav.c_str()),
+            900, 750);
+  c.cd();
+  gPad->SetLeftMargin(0.15);
+  gPad->SetRightMargin(0.14);
+  gPad->SetTopMargin(0.07);
+  gPad->SetBottomMargin(0.12);
+  if (CFG::LOGZ) gPad->SetLogz();
 
-  // order: numu, numubar, nue, nuebar
-  for(size_t i=0;i<H_mode.size();++i){
-    c.cd((int)i+1);
-    gPad->SetRightMargin(0.14);
-    if(CFG::LOGZ) gPad->SetLogz();
-
-    TH2D* H = H_mode[i].hist;
-    if(!H){ TLatex t; t.SetTextFont(42); t.SetTextSize(0.05);
-            t.DrawLatexNDC(0.2,0.5,"[missing histogram]"); continue; }
-
-    H->GetXaxis()->SetRangeUser(xlo, xhi);
-    H->GetYaxis()->SetRangeUser(ylo, yhi);
-    H->SetMinimum(zmin);
-    H->SetMaximum(zmax);
-    H->Draw("COLZ");
-
-    // Flavor label in-pad (top-left)
-    TLatex lab;
-    lab.SetTextFont(42);
-    lab.SetTextSize(0.052);
-    lab.DrawLatexNDC(0.16, 0.92, label_for(H_mode[i].flav).c_str());
+  if (!hr.hist) {
+    TLatex t; t.SetTextFont(42); t.SetTextSize(0.05);
+    t.DrawLatexNDC(0.20, 0.50, "[missing histogram]");
+    c.Print(Form("uboone_figB_EvTheta_%s_%s.pdf",
+                 hr.mode.c_str(), hr.flav.c_str()));
+    return;
   }
 
+  TH2D* H = hr.hist;
+  H->GetXaxis()->SetRangeUser(xlo, xhi);
+  H->GetYaxis()->SetRangeUser(ylo, yhi);
+  H->SetMinimum(zmin);
+  H->SetMaximum(zmax);
+  H->Draw("COLZ");
+
+  TLatex lab; lab.SetTextFont(42); lab.SetTextSize(0.052); lab.SetTextAlign(13);
+  lab.DrawLatexNDC(0.16, 0.92, label_for(hr.flav).c_str());
   c.Update();
-  c.Print(Form("uboone_figB_EvTheta_%s.pdf",mode));
+  c.Print(Form("uboone_figB_EvTheta_%s_%s.pdf",
+               hr.mode.c_str(), hr.flav.c_str()));
 }
 
-void flux_fig_B_EvTheta_minimal(const char* fhc_file = CFG::FILE_FHC,
-                                const char* rhc_file = CFG::FILE_RHC){
+void flux_fig_B_EvTheta_minimal(){
   set_global_style();
 
   // Open files
-  TFile fFHC(fhc_file,"READ");
-  TFile fRHC(rhc_file,"READ");
-  if(fFHC.IsZombie()){ ::printf("[error] Cannot open FHC file: %s\n", fhc_file); return; }
-  if(fRHC.IsZombie()){ ::printf("[error] Cannot open RHC file: %s\n", rhc_file); return; }
+  TFile fFHC(CFG::FILE_FHC,"READ");
+  TFile fRHC(CFG::FILE_RHC,"READ");
+  if(fFHC.IsZombie()){ ::printf("[error] Cannot open FHC file: %s\n", CFG::FILE_FHC); return; }
+  if(fRHC.IsZombie()){ ::printf("[error] Cannot open RHC file: %s\n", CFG::FILE_RHC); return; }
 
   // Gather all histograms (both modes) for uniform ranges
   std::vector<HRef> H_all; H_all.reserve(8);
@@ -261,9 +261,9 @@ void flux_fig_B_EvTheta_minimal(const char* fhc_file = CFG::FILE_FHC,
   ::printf("       theta: [%.6g, %.6g] rad\n", ylo, yhi);
   ::printf("       Z(min>0,max): [%.6g, %.6g]\n", zmin, zmax);
 
-  // Draw each mode with the same X/Y/Z ranges
-  draw_mode_canvas("FHC", H_FHC, xlo, xhi, ylo, yhi, zmin, zmax);
-  draw_mode_canvas("RHC", H_RHC, xlo, xhi, ylo, yhi, zmin, zmax);
+  // Save one PDF per flavor per mode (identical X/Y/Z across all)
+  for (const auto& hr : H_FHC) draw_single_canvas(hr, xlo, xhi, ylo, yhi, zmin, zmax);
+  for (const auto& hr : H_RHC) draw_single_canvas(hr, xlo, xhi, ylo, yhi, zmin, zmax);
 
   // Cleanup clones
   for(auto& hr : H_all) delete hr.hist;
