@@ -55,7 +55,7 @@ static TLegend* build_flux_legend_like_stacked(TPad* p_leg, TH1* h_numu, TH1* h_
   return L;
 }
 
-static void style_line(TH1* h,int col,int ls){ h->SetLineColor(col); h->SetLineStyle(ls); h->SetLineWidth(1.2); h->SetMarkerSize(0); }
+static void style_line(TH1* h,int col,int ls){ h->SetLineColor(col); h->SetLineStyle(ls); h->SetLineWidth(2); h->SetMarkerSize(0); }
 
 static double integral_in(double xmin, double xmax, const TH1* h, bool width=false){
   int bmin = std::max(1, h->GetXaxis()->FindFixBin(xmin + 1e-9));
@@ -153,7 +153,8 @@ static void write_flux_spectrum_csv(const char* outdir, const char* mode,
                                     const TH1* a, const TH1* b,
                                     const TH1* c, const TH1* d){
   gSystem->mkdir(Form("%s/flux", outdir), true);
-  TString m = TString(mode).ToLower();
+  TString m(mode);
+  m.ToLower();
   std::ofstream fo(Form("%s/flux/numi_%s_flux.csv", outdir, m.Data()));
   fo << "# Columns are per energy bin. Values are INTEGRATED per bin "
         "(content × binWidth): # / (6×10^20 POT) / cm^2.\n";
@@ -186,7 +187,8 @@ static void write_window_integrals_csv(const char* outdir, const char* mode,
                                        const TH1* c, const TH1* d,
                                        double Emin, double Emax){
   gSystem->mkdir(Form("%s/flux", outdir), true);
-  TString m = TString(mode).ToLower();
+  TString m(mode);
+  m.ToLower();
   std::ofstream fo(Form("%s/flux/numi_%s_integrals_%s.csv", outdir, m.Data(), tag));
   fo << "# Integrated flux in window (" << std::fixed << std::setprecision(3)
      << Emin << "," << Emax << ") GeV.\n";
