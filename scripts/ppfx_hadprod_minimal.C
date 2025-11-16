@@ -118,7 +118,11 @@ static TLegend* build_legend_toppad(TPad* p_leg,
   L->SetEntrySeparation(0.00); L->SetMargin(0.25);
   const double s_main=0.045; const double s_leg=s_main*(split/(1.0-split));
   L->SetTextSize(s_leg);
-  for(auto& it: items) L->AddEntry(it.first, it.second, (it.first && it.first->GetFillColorAlpha()>0)? "f":"l");
+  auto has_fill = [](const TH1* h){
+    if(!h) return false;
+    return (h->GetFillColor()!=0) && (h->GetFillStyle()!=0);
+  };
+  for(auto& it: items) L->AddEntry(it.first, it.second, has_fill(it.first)? "f":"l");
   return L;
 }
 
@@ -298,7 +302,7 @@ static void draw_ppfx_ensemble_and_band(const char* mode, TFile& f, const std::s
   frame->Draw("AXIS");
 
   // Spaghetti universes (faint)
-#if ROOT_VERSION_CODE >= ROOT_VERSION(6,08,00)
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6,8,0)
   const int ucol = TColor::GetColor("#1f78b4");
   for(auto* u : allU){ style_line(u,ucol,1,1.0); u->SetLineColorAlpha(ucol,0.12); u->Draw("HIST SAME"); }
 #else
