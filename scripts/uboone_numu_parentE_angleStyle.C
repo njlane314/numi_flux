@@ -172,21 +172,24 @@ static void draw_numu_parent_energy(const char* mode, TFile& f){
     make_density(h);
   }
 
-  // Styling (same palette as your angle plots; +/- get different line styles)
-  int CR=TColor::GetColor("#e41a1c"); // red
-  int CB=TColor::GetColor("#1f78b4"); // blue
-  int CP=TColor::GetColor("#984ea3"); // purple
-  int CG=TColor::GetColor("#4daf4a"); // green
-  int CK=TColor::GetColor("#222222"); // black-ish
+  // Styling: switch to a more vibrant palette and SOLID lines only (no dashed)
+  int C_piP = TColor::GetColor("#ff1744"); // bright red
+  int C_piM = TColor::GetColor("#ff6d00"); // vivid orange
+  int C_kP  = TColor::GetColor("#2979ff"); // bright blue
+  int C_kM  = TColor::GetColor("#00c853"); // vivid green
+  int C_muP = TColor::GetColor("#7c4dff"); // vivid violet
+  int C_muM = TColor::GetColor("#aa00ff"); // vivid magenta
+  int C_KL  = TColor::GetColor("#00e5ff"); // bright cyan
+  int C_tot = TColor::GetColor("#111111"); // near-black for total
 
-  style_line(h_piP, CR, 1);
-  style_line(h_piM, CR, 2);
-  style_line(h_kP , CB, 1);
-  style_line(h_kM , CB, 2);
-  style_line(h_muP, CP, 1);
-  style_line(h_muM, CP, 2);
-  style_line(h_KL , CG, 3);
-  style_line(Htot , CK, 1, /*lw=*/1.8); // make the total stand out a bit
+  style_line(h_piP, C_piP, 1);
+  style_line(h_piM, C_piM, 1);
+  style_line(h_kP , C_kP , 1);
+  style_line(h_kM , C_kM , 1);
+  style_line(h_muP, C_muP, 1);
+  style_line(h_muM, C_muM, 1);
+  style_line(h_KL , C_KL , 1);
+  style_line(Htot , C_tot, 1, /*lw=*/1.8); // keep total slightly thicker
 
   // Canvas in your stacked/legend style
   const double split=0.85;
@@ -197,12 +200,19 @@ static void draw_numu_parent_energy(const char* mode, TFile& f){
 
   // Axes & ranges
   p_main->cd();
-  double xmin=Htot->GetXaxis()->GetXmin(), xmax=Htot->GetXaxis()->GetXmax();
-  TH1D* frame=new TH1D(Form("frame_numu_parentE_%s",mode),"",100,xmin,xmax);
+  // Keep full histogram span for computations, but PLOT only 0–10 GeV
+  double xmin_full = Htot->GetXaxis()->GetXmin();
+  double xmax_full = Htot->GetXaxis()->GetXmax();
+  double xmin_plot = 0.0, xmax_plot = 10.0;
+  TH1D* frame=new TH1D(Form("frame_numu_parentE_%s",mode),"",100,xmin_plot,xmax_plot);
   frame->GetXaxis()->SetTitle("E_{#nu} [GeV]");
   frame->GetYaxis()->SetTitle("Flux / 6 #times 10^{20} POT / GeV / cm^{2}");
-  auto_logy_limits_range(frame,{Htot,h_piP,h_piM,h_kP,h_kM,h_muP,h_muM,h_KL},xmin,xmax);
+  auto_logy_limits_range(frame,{Htot,h_piP,h_piM,h_kP,h_kM,h_muP,h_muM,h_KL},xmin_plot,xmax_plot);
   frame->Draw("AXIS");
+  // Restrict each histogram’s visible x-range to [0,10] GeV
+  for(TH1* h : std::vector<TH1*>{Htot,h_piP,h_piM,h_kP,h_kM,h_muP,h_muM,h_KL}){
+    h->GetXaxis()->SetRangeUser(xmin_plot, xmax_plot);
+  }
 
   // Draw (parents first, then total on top)
   h_piP->Draw("HIST SAME"); h_piM->Draw("HIST SAME");
@@ -213,13 +223,13 @@ static void draw_numu_parent_energy(const char* mode, TFile& f){
 
   // Percentages for E\u03bd > 60 MeV (width=true integrates GeV to match units)
   const double thr = CFG::E_FRAC_MIN;
-  double SpiP = integral_in(thr,xmax,h_piP,true);
-  double SpiM = integral_in(thr,xmax,h_piM,true);
-  double SkP  = integral_in(thr,xmax,h_kP ,true);
-  double SkM  = integral_in(thr,xmax,h_kM ,true);
-  double SmuP = integral_in(thr,xmax,h_muP,true);
-  double SmuM = integral_in(thr,xmax,h_muM,true);
-  double SKL  = integral_in(thr,xmax,h_KL ,true);
+  double SpiP = integral_in(thr,xmax_full,h_piP,true);
+  double SpiM = integral_in(thr,xmax_full,h_piM,true);
+  double SkP  = integral_in(thr,xmax_full,h_kP ,true);
+  double SkM  = integral_in(thr,xmax_full,h_kM ,true);
+  double SmuP = integral_in(thr,xmax_full,h_muP,true);
+  double SmuM = integral_in(thr,xmax_full,h_muM,true);
+  double SKL  = integral_in(thr,xmax_full,h_KL ,true);
 
   // Legend (put "Total Flux" last so it has no percentage)
   p_leg->cd();
