@@ -1,35 +1,8 @@
 // ============================================================================
-// flux_fig_B_EvTheta_minimal.C
-//
-// Figure B — Energy–angle (E\u03bd, \u03b8\u03bd) heatmaps per flavor, FHC & RHC.
-// Why: makes the energy–angle correlation explicit; motivates any acceptance
-//       in angle and the analysis\u2019 angle variable.
-// Context to cite: These are the 2D analogues of the 1D spectra used to
-//       normalise in Sec. 2.2 of your note; they connect directly to the
-//       integrated fluxes you tabulate for 0.25\u201310 GeV (Table 1).
-//
-// What is drawn:
-//   For each mode in {FHC, RHC} and each flavor in
-//     <flav> \u2208 {numu, numubar, nue, nuebar},
-//   draw  <flav>/Detsmear/<flav>_CV_AV_TPC_2D  with COLZ, logz,
-//   with *identical X/Y axis ranges across all flavors and both modes*.
-//   The Z (color) scale is unified across all 8 heatmaps so colors are comparable.
-//
-// Defaults:
-//   \u2022 X cropped to [0.25, 10] GeV (if that interval lies inside all hist axes);
-//     otherwise the code falls back to the common intersection across hist axes.
-//   \u2022 \u03b8 range chosen as the common intersection across all hist axes.
-//   \u2022 logz on; 255 contours.
-//
-// I/O (defaults match the file structure you showed):
-//   FHC: "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_FHC.root"
-//   RHC: "/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_RHC.root"
-//
-// Usage:
-//   root -l -b -q flux_fig_B_EvTheta_minimal.C
-//
-// Outputs:
-//   uboone_figB_EvTheta_<MODE>_<FLAVOR>.pdf   (eight files)
+// flux_fig_B_EvTheta_minimal.C  (updated)
+// - Watermark removed
+// - Flavor label moved to top-right corner of the plot
+// - Canvas width computed so the drawable area is ~square
 // ============================================================================
 
 #include "TFile.h"
@@ -68,14 +41,14 @@ namespace CFG {
   constexpr bool LOGZ = true;
   constexpr int  NCONT = 255;
 
-  // Layout (NEW): give more room for the palette on the right
+  // Layout: room for the palette on the right
   constexpr double PAD_LEFT   = 0.15;
   constexpr double PAD_RIGHT  = 0.22;
   constexpr double PAD_TOP    = 0.07;
   constexpr double PAD_BOTTOM = 0.12;
 
-  // Watermark text (NEW). Replace with your exact mark if different.
-  const char* WATERMARK_TEXT = "#nu";
+  // Canvas height in pixels; width will be chosen to square the drawable area
+  constexpr int CANVAS_H = 750;
 }
 
 // Minimal, legible global style (matches your font/spacing choices)
@@ -119,7 +92,7 @@ static std::string label_for(const std::string& flav){
   if(flav=="numubar") return "#bar{#nu}_{#mu}";
   if(flav=="nue")     return "#nu_{e}";
   if(flav=="nuebar")  return "#bar{#nu}_{e}";
-  return flav.c_str();
+  return flav;
 }
 
 // Compute common X/Y intersection across all hists; optionally crop X to [0.25,10] GeV.
@@ -212,28 +185,22 @@ static TH2D* fetch_clone(TFile& f, const std::string& flav){
   return c;
 }
 
-static void draw_watermark_top_right(const char* text){
-  if(!gPad) return;
-  TLatex w;
-  w.SetTextFont(42);
-  w.SetTextSize(0.040);
-  w.SetTextAlign(33);
-  w.SetTextColor(kGray+2);
-  const double x = 1.0 - gPad->GetRightMargin() - 0.01;
-  const double y = 1.0 - gPad->GetTopMargin()   - 0.01;
-  w.DrawLatexNDC(x, y, text);
-}
-
 // One-pad, per-flavor canvas (shared X/Y/Z ranges)
 static void draw_single_canvas(const HRef& hr,
                                double xlo, double xhi,
                                double ylo, double yhi,
                                double zmin, double zmax)
 {
+  // Choose canvas width so the drawable area is ~square:
+  const double wfrac = 1.0 - CFG::PAD_LEFT - CFG::PAD_RIGHT;
+  const double hfrac = 1.0 - CFG::PAD_TOP  - CFG::PAD_BOTTOM;
+  const int W = int( CFG::CANVAS_H * (hfrac / wfrac) + 0.5 );
+  const int H = CFG::CANVAS_H;
+
   TCanvas c(Form("c_single_%s_%s", hr.mode.c_str(), hr.flav.c_str()),
             Form("(E_{#nu}, #theta_{#nu}) — %s, %s",
                  hr.mode.c_str(), hr.flav.c_str()),
-            900, 750);
+            W, H);
   c.cd();
   c.SetFillColor(kWhite);
   c.SetBorderMode(0);
@@ -253,16 +220,16 @@ static void draw_single_canvas(const HRef& hr,
     return;
   }
 
-  TH2D* H = hr.hist;
-  H->GetXaxis()->SetRangeUser(xlo, xhi);
-  H->GetYaxis()->SetRangeUser(ylo, yhi);
-  H->SetMinimum(zmin);
-  H->SetMaximum(zmax);
-  H->Draw("COLZ");
+  TH2D* H2 = hr.hist;
+  H2->GetXaxis()->SetRangeUser(xlo, xhi);
+  H2->GetYaxis()->SetRangeUser(ylo, yhi);
+  H2->SetMinimum(zmin);
+  H2->SetMaximum(zmax);
+  H2->Draw("COLZ");
 
   gPad->Update();
   if (TPaletteAxis* pal =
-        dynamic_cast<TPaletteAxis*>(H->GetListOfFunctions()->FindObject("palette"))) {
+        dynamic_cast<TPaletteAxis*>(H2->GetListOfFunctions()->FindObject("palette"))) {
     const double x1 = 1.0 - gPad->GetRightMargin() + 0.02;
     const double x2 = x1 + 0.06;
     const double y1 = gPad->GetBottomMargin();
@@ -276,9 +243,11 @@ static void draw_single_canvas(const HRef& hr,
     pal->SetTitleOffset(1.10);
   }
 
-  TLatex lab; lab.SetTextFont(42); lab.SetTextSize(0.052); lab.SetTextAlign(13);
-  lab.DrawLatexNDC(0.16, 0.92, label_for(hr.flav).c_str());
-  draw_watermark_top_right(CFG::WATERMARK_TEXT);
+  // Flavor label — now top-right, inside the plotting area (black)
+  TLatex lab; lab.SetTextFont(42); lab.SetTextSize(0.052); lab.SetTextAlign(33);
+  const double xr = 1.0 - gPad->GetRightMargin() - 0.01;
+  const double yt = 1.0 - gPad->GetTopMargin()   - 0.01;
+  lab.DrawLatexNDC(xr, yt, label_for(hr.flav).c_str());
   c.Update();
   c.Print(Form("uboone_figB_EvTheta_%s_%s.pdf",
                hr.mode.c_str(), hr.flav.c_str()));
