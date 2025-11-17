@@ -19,6 +19,30 @@
 #include <vector>
 #include <string>
 
+// ---------------------------------------------------------------------------
+// Flux unit normalization:
+// Most dk2nu/PPFX flux histograms are stored in  # / (1e9 POT) / m^2 / GeV.
+// We want to report/plot everything in          # / (6e20 POT) / cm^2 / GeV.
+// => multiply hist contents by:
+//    (6e20 / 1e9) [POT]  ×  (1 / 1e4) [m^-2 -> cm^-2]  =  6e7.
+// If your file is per 1 POT (not 1e9 POT), set kPOT_IN_FILE = 1.0.
+// ---------------------------------------------------------------------------
+static constexpr double kPOT_TARGET   = 6.0e20;  // what we print/show
+static constexpr double kPOT_IN_FILE  = 1.0e9;   // file convention (typical dk2nu/ppfx)
+static constexpr double kM2_TO_CM2    = 1.0e-4;  // m^-2 -> cm^-2
+static constexpr double kUNIT_SCALE   = (kPOT_TARGET / kPOT_IN_FILE) * kM2_TO_CM2; // = 6e7 by default
+
+static inline void scale_flux_to_release_units(TH1* h){
+  if(h) h->Scale(kUNIT_SCALE);
+}
+static inline void scale_flux_to_release_units(TH1* h1, TH1* h2, TH1* h3, TH1* h4){
+  scale_flux_to_release_units(h1);
+  scale_flux_to_release_units(h2);
+  scale_flux_to_release_units(h3);
+  scale_flux_to_release_units(h4);
+}
+// ---------------------------------------------------------------------------
+
 static void set_global_style(){
   const int f=42;
   TStyle* s=new TStyle("PlotterStyle","Plotter Style");
@@ -87,7 +111,7 @@ static void print_flux_window_integrals(const char* tag,
 
   printf("[plot_flux_minimal/%s] Energy-window integrals (%.2f–%.2f GeV)\n", tag, xmin, xmax);
   printf("  (TH1::Integral(...,\"width\") used: area = sum(content × binWidth).\n");
-  printf("   Units ≈ # / 6×10^20 POT / cm^2; histogram y-axis is per %d MeV.)\n", binwMeV);
+  printf("   Units: # / (6×10^20 POT) / cm^2; histogram y-axis is per %d MeV.)\n", binwMeV);
 
   printf("    nu_mu      : % .6e  ± %.2e   (%.1f%%)\n", i_numu , e_numu , pct(i_numu ));
   printf("    anti-nu_mu : % .6e  ± %.2e   (%.1f%%)\n", i_anumu, e_anumu, pct(i_anumu));
@@ -131,6 +155,8 @@ static bool load_flux_hists(const char* file, FluxHists& H, const char* tag){
   if(H.nue    ) H.nue    ->SetDirectory(0);
   if(H.nuebar ) H.nuebar ->SetDirectory(0);
   f.Close();
+  // Normalize all histograms to # / (6e20 POT) / cm^2 / GeV
+  scale_flux_to_release_units(H.numu, H.numubar, H.nue, H.nuebar);
   if(!H.numu || !H.numubar || !H.nue || !H.nuebar){
     printf("[tables/%s] missing *_CV_AV_TPC in Detsmear\n", tag);
     return false;
@@ -249,6 +275,7 @@ static void draw_one(const char* file,const char* tag,const char* out){
   a=(TH1D*)a->Clone("h_numu"); b=(TH1D*)b->Clone("h_anumu"); c=(TH1D*)c->Clone("h_nue"); d=(TH1D*)d->Clone("h_anue");
   a->SetDirectory(0); b->SetDirectory(0); c->SetDirectory(0); d->SetDirectory(0); f.Close();
 
+  scale_flux_to_release_units(a, b, c, d); // convert to #/(6e20 POT)/cm^2/GeV before any integrals/plots
   print_flux_window_integrals(tag, a, b, c, d, EanaMin, Emax);
 
   int CR=TColor::GetColor("#e41a1c"), CB=TColor::GetColor("#1f78b4");
@@ -291,6 +318,10 @@ void plot_flux_minimal(){
   draw_one("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_FHC.root","FHC","uboone_flux_FHC.pdf");
   draw_one("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_RHC.root","RHC","uboone_flux_RHC.pdf");
 
+  // Informative print for sanity:
+  printf("[units] Histograms scaled by kUNIT_SCALE = %.3e to #/(6e20 POT)/cm^2/GeV "
+         "(kPOT_TARGET=%.3e, kPOT_IN_FILE=%.3e, m^2->cm^2=%g)\n",
+         kUNIT_SCALE, kPOT_TARGET, kPOT_IN_FILE, kM2_TO_CM2);
   // -------- NEW: write machine-readable flux tables for x-sec release --------
   const char* outdir = "release"; // adjust to your repository root if needed
   make_tables_one("/exp/uboone/data/users/bnayak/ppfx/flugg_studies/NuMIFlux_dk2nu_FHC.root","FHC",outdir);
