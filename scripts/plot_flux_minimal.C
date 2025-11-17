@@ -239,6 +239,7 @@ static void make_tables_one(const char* file, const char* mode, const char* outd
 
 static void draw_one(const char* file,const char* tag,const char* out){
   const double Emin=0.0, Emax=10.0, split=0.85;
+  const double EanaMin = 0.25;  // analysis window used everywhere
   TFile f(file,"READ");
   TH1D* a=(TH1D*)f.Get("numu/Detsmear/numu_CV_AV_TPC_5MeV_bin"); if(!a) a=(TH1D*)f.Get("numu/Detsmear/numu_CV_AV_TPC");
   TH1D* b=(TH1D*)f.Get("numubar/Detsmear/numubar_CV_AV_TPC_5MeV_bin"); if(!b) b=(TH1D*)f.Get("numubar/Detsmear/numubar_CV_AV_TPC");
@@ -248,8 +249,7 @@ static void draw_one(const char* file,const char* tag,const char* out){
   a=(TH1D*)a->Clone("h_numu"); b=(TH1D*)b->Clone("h_anumu"); c=(TH1D*)c->Clone("h_nue"); d=(TH1D*)d->Clone("h_anue");
   a->SetDirectory(0); b->SetDirectory(0); c->SetDirectory(0); d->SetDirectory(0); f.Close();
 
-  const double PrintMin = 0.25;
-  print_flux_window_integrals(tag, a, b, c, d, PrintMin, Emax);
+  print_flux_window_integrals(tag, a, b, c, d, EanaMin, Emax);
 
   int CR=TColor::GetColor("#e41a1c"), CB=TColor::GetColor("#1f78b4");
   style_line(a,CR,1); style_line(c,CR,2); style_line(b,CB,1); style_line(d,CB,3);
@@ -272,7 +272,11 @@ static void draw_one(const char* file,const char* tag,const char* out){
   a->Draw("HIST SAME"); c->Draw("HIST SAME"); b->Draw("HIST SAME"); d->Draw("HIST SAME");
 
   p_leg->cd();
-  double s_numu=integral_in(Emin,Emax,a), s_anumu=integral_in(Emin,Emax,b), s_nue=integral_in(Emin,Emax,c), s_anue=integral_in(Emin,Emax,d);
+  // Use the same area definition ("width") and the same window [0.25, 10]
+  double s_numu  = integral_in(EanaMin, Emax, a, /*width=*/true);
+  double s_anumu = integral_in(EanaMin, Emax, b, /*width=*/true);
+  double s_nue   = integral_in(EanaMin, Emax, c, /*width=*/true);
+  double s_anue  = integral_in(EanaMin, Emax, d, /*width=*/true);
   double s_tot=std::max(1e-300,s_numu+s_anumu+s_nue+s_anue);
   TLegend* L=build_flux_legend_like_stacked(p_leg,a,b,c,d,split,s_numu,s_anumu,s_nue,s_anue,s_tot);
   L->Draw();
