@@ -36,7 +36,7 @@ namespace cfgS {
   constexpr double pmin_p     = 0.25;       // proton threshold [GeV/c]
   constexpr double pmin_pi    = 0.10;       // pion   threshold [GeV/c]
   constexpr double Emin_gamma = 0.050;      // photon lab energy threshold [GeV]  <-- set to your detector
-  constexpr double vline_pS   = 0.53;       // dashed vertical reference line (set <0 to use analytic pS_thr)
+  constexpr double vline_pS   = 0.50;       // dashed vertical reference line (set <0 to use analytic pS_thr)
   constexpr int    nbins = 30;
   constexpr double xlow  = 0.0, xhigh = 3.0; // p_Σ range [GeV/c]
   constexpr int    Np  = 600;               // sampling in p_Σ
