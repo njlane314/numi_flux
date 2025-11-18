@@ -36,6 +36,7 @@ namespace cfgS {
   constexpr double pmin_p     = 0.25;       // proton threshold [GeV/c]
   constexpr double pmin_pi    = 0.10;       // pion   threshold [GeV/c]
   constexpr double Emin_gamma = 0.050;      // photon lab energy threshold [GeV]  <-- set to your detector
+  constexpr double vline_pS   = 0.45;       // dashed vertical reference line (set <0 to use analytic pS_thr)
   constexpr int    nbins = 30;
   constexpr double xlow  = 0.0, xhigh = 3.0; // p_Σ range [GeV/c]
   constexpr int    Np  = 600;               // sampling in p_Σ
@@ -175,7 +176,9 @@ void make_sigma0_lambda_visibility_plot() {
   if (eff) eff->Draw("pe same");
 
   // Vertical line at analytic Σ0 turn-on (Λ-only)
-  TLine L(pS_thr, 0.0, pS_thr, 1.05);
+  const double vline_pS = (cfgS::vline_pS >= 0.0) ? cfgS::vline_pS : pS_thr;
+  const bool usingAnalyticLine = (cfgS::vline_pS < 0.0);
+  TLine L(vline_pS, 0.0, vline_pS, 1.05);
   L.SetLineStyle(2); L.SetLineWidth(2); L.Draw("same");
 
   // Legend
@@ -184,7 +187,9 @@ void make_sigma0_lambda_visibility_plot() {
   leg.AddEntry(gF,    "F_{kin}^{#Lambda only}(p_{#Sigma^{0}})", "l");
   leg.AddEntry(gBoth, Form("F_{kin}^{#Lambda + #gamma}(p_{#Sigma^{0}}), E_{#gamma}^{min}=%.0f MeV",
                            1000.0*cfgS::Emin_gamma), "l");
-  leg.AddEntry(&L,    Form("p^{thr}_{#Sigma^{0}} (#Lambda only) = %.3f GeV/c", pS_thr), "l");
+  leg.AddEntry(&L,    usingAnalyticLine
+                    ? Form("p^{thr}_{#Sigma^{0}} (#Lambda only) = %.3f GeV/c", vline_pS)
+                    : Form("Reference p_{#Sigma^{0}} = %.3f GeV/c", vline_pS), "l");
   leg.Draw();
 
   c.SaveAs("sigma0_lambda_gamma_visibility_efficiency.pdf");
